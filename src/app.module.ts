@@ -8,6 +8,9 @@ import { OrdersModule } from './modules/orders/orders.module';
 import { PaymentsModule } from './modules/payments/payments.module';
 import { ShiftsModule } from './modules/shifts/shifts.module';
 import { PrintersModule } from './modules/printers/printers.module';
+import { InventoryModule } from './modules/inventory/inventory.module';
+import { RecipesModule } from './modules/recipes/recipes.module';
+import { PurchasingModule } from './modules/purchasing/purchasing.module';
 
 @Module({
   imports: [
@@ -20,6 +23,9 @@ import { PrintersModule } from './modules/printers/printers.module';
     PaymentsModule,
     ShiftsModule,
     PrintersModule,
+    InventoryModule,
+    RecipesModule,
+    PurchasingModule,
   ],
   controllers: [],
   providers: [],

@@ -5,6 +5,9 @@ import { AuthModule } from './modules/auth/auth.module';
 import { TablesModule } from './modules/tables/tables.module';
 import { ProductsModule } from './modules/products/products.module';
 import { OrdersModule } from './modules/orders/orders.module';
+import { PaymentsModule } from './modules/payments/payments.module';
+import { ShiftsModule } from './modules/shifts/shifts.module';
+import { PrintersModule } from './modules/printers/printers.module';
 
 @Module({
   imports: [
@@ -14,6 +17,9 @@ import { OrdersModule } from './modules/orders/orders.module';
     TablesModule,
     ProductsModule,
     OrdersModule,
+    PaymentsModule,
+    ShiftsModule,
+    PrintersModule,
   ],
   controllers: [],
   providers: [],

@@ -58,7 +58,7 @@ export class PrintersService {
       },
       include: {
         printer: true,
-        printedBy: true,
+        printedBy: { select: { id: true, name: true, email: true } },
         order: {
           include: {
             orderItems: {

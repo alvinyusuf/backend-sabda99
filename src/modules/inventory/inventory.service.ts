@@ -295,19 +295,24 @@ export class InventoryService {
       });
 
       for (const item of dto.items) {
-        await tx.stock.upsert({
+        const currentStock = await tx.stock.findUnique({
           where: {
             warehouseId_inventoryItemId: {
               warehouseId: dto.warehouseId,
               inventoryItemId: item.inventoryItemId,
             },
           },
-          update: { quantity: { decrement: item.quantity } },
-          create: {
-            warehouseId: dto.warehouseId,
-            inventoryItemId: item.inventoryItemId,
-            quantity: -item.quantity,
-          },
+        });
+
+        if (!currentStock || Number(currentStock.quantity) < item.quantity) {
+          throw new BadRequestException(
+            `Insufficient stock for item ID ${item.inventoryItemId} in this warehouse`,
+          );
+        }
+
+        await tx.stock.update({
+          where: { id: currentStock.id },
+          data: { quantity: { decrement: item.quantity } },
         });
 
         await tx.stockMovement.create({

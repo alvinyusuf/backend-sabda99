@@ -8,10 +8,10 @@ async function main() {
 
   // 1. Create Default Outlet
   const outlet = await prisma.outlet.upsert({
-    where: { id: '00000000-0000-0000-0000-000000000001' },
+    where: { id: '00000000-0000-4000-8000-000000000001' },
     update: {},
     create: {
-      id: '00000000-0000-0000-0000-000000000001',
+      id: '00000000-0000-4000-8000-000000000001',
       name: 'SABDA 99 Coffee Shop',
       address: 'Jl. Utama Sabda 99 No. 1',
       isActive: true,

@@ -37,7 +37,7 @@ export class ShiftsService {
         openedAt: new Date(),
       },
       include: {
-        user: true,
+        user: { select: { id: true, name: true, email: true } },
       },
     });
   }

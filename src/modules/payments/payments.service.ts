@@ -123,7 +123,7 @@ export class PaymentsService {
         },
         include: {
           paymentMethod: true,
-          confirmedBy: true,
+          confirmedBy: { select: { id: true, name: true, email: true } },
         },
       });
 

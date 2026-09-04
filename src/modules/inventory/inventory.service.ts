@@ -402,6 +402,118 @@ export class InventoryService {
   }
 
   // --------------------------------------------------
+  // Stock Restoration for Cancelled Orders
+  // --------------------------------------------------
+  async restoreStockForOrder(
+    orderId: string,
+    warehouseId: string,
+    tx?: any,
+  ) {
+    const prisma = tx || this.prisma;
+
+    const order = await prisma.order.findUnique({
+      where: { id: orderId },
+      include: {
+        orderItems: {
+          include: {
+            orderItemModifiers: true,
+          },
+        },
+      },
+    });
+
+    if (!order) {
+      throw new NotFoundException(`Order ID ${orderId} not found`);
+    }
+
+    const restorations: { inventoryItemId: string; quantity: number }[] = [];
+
+    for (const item of order.orderItems) {
+      const recipe = await prisma.recipe.findFirst({
+        where: { productId: item.productId, isActive: true },
+        include: { recipeItems: true },
+      });
+
+      if (!recipe) continue;
+
+      for (const recipeItem of recipe.recipeItems) {
+        const restoreQty = Number(recipeItem.quantity) * Number(item.quantity);
+        restorations.push({
+          inventoryItemId: recipeItem.inventoryItemId,
+          quantity: restoreQty,
+        });
+      }
+
+      for (const mod of item.orderItemModifiers) {
+        const modifierRecipe = await prisma.modifierRecipeItem.findFirst({
+          where: { modifierId: mod.modifierId },
+        });
+
+        if (modifierRecipe) {
+          const restoreQty =
+            Number(modifierRecipe.quantity) * Number(item.quantity);
+          restorations.push({
+            inventoryItemId: modifierRecipe.inventoryItemId,
+            quantity: restoreQty,
+          });
+        }
+      }
+    }
+
+    if (restorations.length === 0) {
+      return { restored: 0, items: [] };
+    }
+
+    const aggregated = new Map<string, number>();
+    for (const r of restorations) {
+      aggregated.set(
+        r.inventoryItemId,
+        (aggregated.get(r.inventoryItemId) || 0) + r.quantity,
+      );
+    }
+
+    const results: { inventoryItemId: string; restored: number }[] = [];
+
+    for (const [inventoryItemId, totalQty] of aggregated.entries()) {
+      const stock = await prisma.stock.findUnique({
+        where: {
+          warehouseId_inventoryItemId: { warehouseId, inventoryItemId },
+        },
+      });
+
+      if (stock) {
+        await prisma.stock.update({
+          where: { id: stock.id },
+          data: { quantity: { increment: totalQty } },
+        });
+      } else {
+        await prisma.stock.create({
+          data: {
+            warehouseId,
+            inventoryItemId,
+            quantity: totalQty,
+          },
+        });
+      }
+
+      await prisma.stockMovement.create({
+        data: {
+          warehouseId,
+          inventoryItemId,
+          type: StockMovementType.SALE_REVERSAL,
+          quantity: totalQty,
+          referenceType: 'ORDER',
+          referenceId: orderId,
+        },
+      });
+
+      results.push({ inventoryItemId, restored: totalQty });
+    }
+
+    return { restored: results.length, items: results };
+  }
+
+  // --------------------------------------------------
   // Waste Recording
   // --------------------------------------------------
   async recordWaste(userId: string, dto: RecordWasteDto) {

@@ -8,6 +8,7 @@ import {
   CreatePaymentMethodDto,
   ProcessPaymentDto,
   ConfirmCashPaymentDto,
+  RefundPaymentDto,
 } from './dto/payment.dto';
 import { OrderStatus, PaymentMethodType, PaymentStatus } from '@prisma/client';
 
@@ -145,6 +146,65 @@ export class PaymentsService {
           data: { status: 'QUEUED', queuedAt: new Date() },
         });
       }
+
+      return updatedPayment;
+    });
+  }
+
+  async refundPayment(paymentId: string, dto: RefundPaymentDto, userId: string) {
+    const payment = await this.prisma.payment.findUnique({
+      where: { id: paymentId },
+      include: { order: true, paymentMethod: true },
+    });
+
+    if (!payment) {
+      throw new NotFoundException(`Payment ID ${paymentId} not found`);
+    }
+
+    if (payment.status !== PaymentStatus.PAID) {
+      throw new BadRequestException('Can only refund payments with PAID status');
+    }
+
+    // Find current open shift for the outlet
+    const order = await this.prisma.order.findUnique({
+      where: { id: payment.orderId },
+      select: { outletId: true },
+    });
+
+    const currentShift = await this.prisma.shift.findFirst({
+      where: {
+        outletId: order!.outletId,
+        status: 'OPEN',
+      },
+    });
+
+    if (!currentShift) {
+      throw new BadRequestException('No open shift found for this outlet');
+    }
+
+    return this.prisma.$transaction(async (tx) => {
+      const updatedPayment = await tx.payment.update({
+        where: { id: paymentId },
+        data: {
+          status: PaymentStatus.REFUNDED,
+        },
+        include: {
+          paymentMethod: true,
+        },
+      });
+
+      // Record cash movement for refund
+      await tx.cashMovement.create({
+        data: {
+          shiftId: currentShift.id,
+          type: 'REFUND',
+          amount: -Number(payment.amount),
+          reason: dto.reason,
+          referenceType: 'PAYMENT',
+          referenceId: paymentId,
+          createdById: userId,
+        },
+      });
 
       return updatedPayment;
     });

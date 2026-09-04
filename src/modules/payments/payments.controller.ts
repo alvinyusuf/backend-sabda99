@@ -12,6 +12,7 @@ import {
   CreatePaymentMethodDto,
   ProcessPaymentDto,
   ConfirmCashPaymentDto,
+  RefundPaymentDto,
 } from './dto/payment.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
@@ -50,5 +51,17 @@ export class PaymentsController {
     @CurrentUser('id') userId: string,
   ) {
     return this.paymentsService.confirmCashPayment(dto.paymentId, userId);
+  }
+
+  // Refund Endpoint
+  @Post(':id/refund')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('SUPERADMIN', 'MANAGER')
+  async refundPayment(
+    @Param('id') id: string,
+    @Body() dto: RefundPaymentDto,
+    @CurrentUser('id') userId: string,
+  ) {
+    return this.paymentsService.refundPayment(id, dto, userId);
   }
 }

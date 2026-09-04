@@ -46,3 +46,9 @@ export class ConfirmCashPaymentDto {
   @IsNotEmpty()
   paymentId: string;
 }
+
+export class RefundPaymentDto {
+  @IsString()
+  @IsNotEmpty()
+  reason: string;
+}

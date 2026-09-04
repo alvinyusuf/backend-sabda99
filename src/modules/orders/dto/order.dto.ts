@@ -67,4 +67,14 @@ export class UpdateOrderStatusDto {
   @IsEnum(OrderStatus)
   @IsNotEmpty()
   status: OrderStatus;
+
+  @IsString()
+  @IsOptional()
+  reason?: string;
+}
+
+export class VoidItemDto {
+  @IsString()
+  @IsNotEmpty()
+  reason: string;
 }

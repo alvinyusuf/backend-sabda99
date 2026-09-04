@@ -32,4 +32,14 @@ export class PrintersController {
   ) {
     return this.printersService.generateKot(userId, dto);
   }
+
+  @Post('generate-receipt')
+  @UseGuards(RolesGuard)
+  @Roles('SUPERADMIN', 'MANAGER', 'CASHIER')
+  async generateReceipt(
+    @CurrentUser('id') userId: string,
+    @Body() dto: { orderId: string },
+  ) {
+    return this.printersService.generateReceipt(userId, dto.orderId);
+  }
 }

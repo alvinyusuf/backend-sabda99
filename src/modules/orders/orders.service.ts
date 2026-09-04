@@ -6,11 +6,19 @@ import {
 import { PrismaService } from '../../database/prisma.service';
 import { InventoryService } from '../inventory/inventory.service';
 import { AuditLogService } from '../../common/services/audit-log.service';
-import { CreateOrderDto, UpdateOrderStatusDto } from './dto/order.dto';
-import { OrderChannel, OrderStatus } from '@prisma/client';
+import { CreateOrderDto, UpdateOrderStatusDto, VoidItemDto } from './dto/order.dto';
+import { OrderChannel, OrderStatus, StockMovementType } from '@prisma/client';
 
 const VALID_ORDER_TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
-  [OrderStatus.WAITING_PAYMENT]: [OrderStatus.CONFIRMED, OrderStatus.CANCELLED],
+  [OrderStatus.WAITING_PAYMENT]: [
+    OrderStatus.CONFIRMED,
+    OrderStatus.CANCELLED,
+    OrderStatus.HOLD,
+  ],
+  [OrderStatus.HOLD]: [
+    OrderStatus.WAITING_PAYMENT,  // Resume
+    OrderStatus.CANCELLED,
+  ],
   [OrderStatus.CONFIRMED]: [OrderStatus.SERVED, OrderStatus.CANCELLED],
   [OrderStatus.SERVED]: [OrderStatus.COMPLETED, OrderStatus.CANCELLED],
   [OrderStatus.COMPLETED]: [],
@@ -212,7 +220,7 @@ export class OrdersService {
     });
   }
 
-  async findOne(id: string) {
+  async findOne(id: string, outletId?: string) {
     const order = await this.prisma.order.findUnique({
       where: { id },
       include: {
@@ -234,6 +242,11 @@ export class OrdersService {
     });
 
     if (!order) {
+      throw new NotFoundException(`Order with ID ${id} not found`);
+    }
+
+    // Validate outlet access if outletId is provided
+    if (outletId && order.outletId !== outletId) {
       throw new NotFoundException(`Order with ID ${id} not found`);
     }
 
@@ -273,6 +286,18 @@ export class OrdersService {
       );
     }
 
+    // Block cancel if order already has PAID payment (Bug 3 fix)
+    if (dto.status === OrderStatus.CANCELLED) {
+      const hasPaidPayment = order.payments.some(
+        (p) => p.status === 'PAID',
+      );
+      if (hasPaidPayment) {
+        throw new BadRequestException(
+          'Order sudah dibayar. Gunakan refund terlebih dahulu.',
+        );
+      }
+    }
+
     const updateData: any = { status: dto.status };
     if (dto.status === OrderStatus.CONFIRMED && !order.confirmedAt) {
       updateData.confirmedAt = new Date();
@@ -280,6 +305,11 @@ export class OrdersService {
       updateData.completedAt = new Date();
     } else if (dto.status === OrderStatus.CANCELLED && !order.cancelledAt) {
       updateData.cancelledAt = new Date();
+      if (dto.reason) {
+        updateData.cancelReason = dto.reason;
+      }
+    } else if (dto.status === OrderStatus.HOLD) {
+      updateData.heldAt = new Date();
     }
 
     // Auto-deduct stock from recipes when order is confirmed — within same transaction
@@ -290,10 +320,8 @@ export class OrdersService {
 
       if (warehouse) {
         return this.prisma.$transaction(async (tx) => {
-          // Consume stock first (will throw if insufficient)
           await this.inventoryService.consumeStockForOrder(id, warehouse.id, tx);
 
-          // Then update order status
           const updatedOrder = await tx.order.update({
             where: { id },
             data: updateData,
@@ -302,7 +330,6 @@ export class OrdersService {
             },
           });
 
-          // Log order status change
           await this.auditLogService.log({
             outletId: order.outletId,
             action: 'STATUS_CHANGED',
@@ -320,6 +347,45 @@ export class OrdersService {
       }
     }
 
+    // Restore stock when cancelling from CONFIRMED or SERVED
+    if (
+      dto.status === OrderStatus.CANCELLED &&
+      ([OrderStatus.CONFIRMED, OrderStatus.SERVED] as OrderStatus[]).includes(order.status)
+    ) {
+      const warehouse = await this.prisma.warehouse.findFirst({
+        where: { outletId: order.outletId, isActive: true },
+      });
+
+      if (warehouse) {
+        return this.prisma.$transaction(async (tx) => {
+          await this.inventoryService.restoreStockForOrder(id, warehouse.id, tx);
+
+          const updatedOrder = await tx.order.update({
+            where: { id },
+            data: updateData,
+            include: {
+              fulfillment: true,
+            },
+          });
+
+          await this.auditLogService.log({
+            outletId: order.outletId,
+            action: 'STATUS_CHANGED',
+            entityType: 'ORDER',
+            entityId: id,
+            metadata: {
+              orderNumber: order.orderNumber,
+              fromStatus: order.status,
+              toStatus: dto.status,
+              reason: dto.reason,
+            },
+          });
+
+          return updatedOrder;
+        });
+      }
+    }
+
     const updatedOrder = await this.prisma.order.update({
       where: { id },
       data: updateData,
@@ -328,7 +394,6 @@ export class OrdersService {
       },
     });
 
-    // Log order status change
     await this.auditLogService.log({
       outletId: order.outletId,
       action: 'STATUS_CHANGED',
@@ -338,9 +403,206 @@ export class OrdersService {
         orderNumber: order.orderNumber,
         fromStatus: order.status,
         toStatus: dto.status,
+        ...(dto.reason ? { reason: dto.reason } : {}),
       },
     });
 
     return updatedOrder;
+  }
+
+  async voidItem(
+    orderId: string,
+    itemId: string,
+    dto: VoidItemDto,
+    userId: string,
+  ) {
+    const order = await this.findOne(orderId);
+
+    if (
+      !([OrderStatus.WAITING_PAYMENT, OrderStatus.CONFIRMED] as OrderStatus[]).includes(
+        order.status,
+      )
+    ) {
+      throw new BadRequestException(
+        'Cannot void items from order in this status. Must be WAITING_PAYMENT or CONFIRMED.',
+      );
+    }
+
+    const orderItem = order.orderItems.find((i) => i.id === itemId);
+    if (!orderItem) {
+      throw new NotFoundException(`Order item ${itemId} not found in this order`);
+    }
+
+    if (orderItem.isVoided) {
+      throw new BadRequestException('This item is already voided');
+    }
+
+    return this.prisma.$transaction(async (tx) => {
+      await tx.orderItem.update({
+        where: { id: itemId },
+        data: {
+          isVoided: true,
+          voidedAt: new Date(),
+          voidReason: dto.reason,
+          voidedById: userId,
+        },
+      });
+
+      // Restore stock if order already confirmed
+      if (order.status === OrderStatus.CONFIRMED) {
+        const warehouse = await this.prisma.warehouse.findFirst({
+          where: { outletId: order.outletId, isActive: true },
+        });
+
+        if (warehouse) {
+          const recipe = await tx.recipe.findFirst({
+            where: { productId: orderItem.productId, isActive: true },
+            include: { recipeItems: true },
+          });
+
+          if (recipe) {
+            for (const recipeItem of recipe.recipeItems) {
+              const restoreQty =
+                Number(recipeItem.quantity) * Number(orderItem.quantity);
+
+              const stock = await tx.stock.findUnique({
+                where: {
+                  warehouseId_inventoryItemId: {
+                    warehouseId: warehouse.id,
+                    inventoryItemId: recipeItem.inventoryItemId,
+                  },
+                },
+              });
+
+              if (stock) {
+                await tx.stock.update({
+                  where: { id: stock.id },
+                  data: { quantity: { increment: restoreQty } },
+                });
+              } else {
+                await tx.stock.create({
+                  data: {
+                    warehouseId: warehouse.id,
+                    inventoryItemId: recipeItem.inventoryItemId,
+                    quantity: restoreQty,
+                  },
+                });
+              }
+
+              await tx.stockMovement.create({
+                data: {
+                  warehouseId: warehouse.id,
+                  inventoryItemId: recipeItem.inventoryItemId,
+                  type: StockMovementType.SALE_REVERSAL,
+                  quantity: restoreQty,
+                  referenceType: 'ORDER_ITEM',
+                  referenceId: itemId,
+                },
+              });
+            }
+
+            // Handle modifier recipes
+            const modifiers = await tx.orderItemModifier.findMany({
+              where: { orderItemId: itemId },
+            });
+
+            for (const mod of modifiers) {
+              const modifierRecipe = await tx.modifierRecipeItem.findFirst({
+                where: { modifierId: mod.modifierId },
+              });
+
+              if (modifierRecipe) {
+                const restoreQty =
+                  Number(modifierRecipe.quantity) * Number(orderItem.quantity);
+
+                const stock = await tx.stock.findUnique({
+                  where: {
+                    warehouseId_inventoryItemId: {
+                      warehouseId: warehouse.id,
+                      inventoryItemId: modifierRecipe.inventoryItemId,
+                    },
+                  },
+                });
+
+                if (stock) {
+                  await tx.stock.update({
+                    where: { id: stock.id },
+                    data: { quantity: { increment: restoreQty } },
+                  });
+                } else {
+                  await tx.stock.create({
+                    data: {
+                      warehouseId: warehouse.id,
+                      inventoryItemId: modifierRecipe.inventoryItemId,
+                      quantity: restoreQty,
+                    },
+                  });
+                }
+
+                await tx.stockMovement.create({
+                  data: {
+                    warehouseId: warehouse.id,
+                    inventoryItemId: modifierRecipe.inventoryItemId,
+                    type: StockMovementType.SALE_REVERSAL,
+                    quantity: restoreQty,
+                    referenceType: 'ORDER_ITEM',
+                    referenceId: itemId,
+                  },
+                });
+              }
+            }
+          }
+        }
+      }
+
+      // Recalculate order totals
+      await this.recalculateOrderTotals(orderId, tx);
+
+      await this.auditLogService.log({
+        outletId: order.outletId,
+        action: 'ITEM_VOIDED',
+        entityType: 'ORDER_ITEM',
+        entityId: itemId,
+        metadata: {
+          orderNumber: order.orderNumber,
+          productName: orderItem.productNameSnapshot,
+          quantity: Number(orderItem.quantity),
+          reason: dto.reason,
+        },
+      });
+
+      return this.findOne(orderId);
+    });
+  }
+
+  private async recalculateOrderTotals(orderId: string, tx: any) {
+    const order = await tx.order.findUnique({
+      where: { id: orderId },
+      include: {
+        orderItems: true,
+      },
+    });
+
+    const activeItems = order.orderItems.filter(
+      (item: any) => !item.isVoided,
+    );
+
+    const subtotal = activeItems.reduce(
+      (sum: number, item: any) => sum + Number(item.subtotal),
+      0,
+    );
+
+    const activeTax = await tx.tax.findFirst({
+      where: { outletId: order.outletId, isActive: true },
+    });
+
+    const taxRate = activeTax ? Number(activeTax.rate) / 100 : 0;
+    const taxAmount = subtotal * taxRate;
+    const totalAmount = subtotal + taxAmount;
+
+    await tx.order.update({
+      where: { id: orderId },
+      data: { subtotal, taxAmount, totalAmount },
+    });
   }
 }

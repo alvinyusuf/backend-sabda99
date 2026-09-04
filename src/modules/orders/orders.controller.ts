@@ -9,11 +9,12 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { OrdersService } from './orders.service';
-import { CreateOrderDto, UpdateOrderStatusDto } from './dto/order.dto';
+import { CreateOrderDto, UpdateOrderStatusDto, VoidItemDto } from './dto/order.dto';
 import { OrderChannel, OrderStatus } from '@prisma/client';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
+import { CurrentUser } from '../../common/decorators/current-user.decorator';
 
 @Controller('orders')
 export class OrdersController {
@@ -56,8 +57,11 @@ export class OrdersController {
 
   @Get(':id')
   @UseGuards(JwtAuthGuard)
-  async getOrderById(@Param('id') id: string) {
-    return this.ordersService.findOne(id);
+  async getOrderById(
+    @Param('id') id: string,
+    @CurrentUser('outletId') outletId: string,
+  ) {
+    return this.ordersService.findOne(id, outletId);
   }
 
   @Put(':id/status')
@@ -68,5 +72,17 @@ export class OrdersController {
     @Body() dto: UpdateOrderStatusDto,
   ) {
     return this.ordersService.updateStatus(id, dto);
+  }
+
+  @Put(':id/items/:itemId/void')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('SUPERADMIN', 'MANAGER', 'CASHIER')
+  async voidItem(
+    @Param('id') id: string,
+    @Param('itemId') itemId: string,
+    @Body() dto: VoidItemDto,
+    @CurrentUser('id') userId: string,
+  ) {
+    return this.ordersService.voidItem(id, itemId, dto, userId);
   }
 }

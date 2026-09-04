@@ -42,11 +42,6 @@ enum FulfillmentStatus {
   COMPLETED
 }
 
-enum TableSessionStatus {
-  OPEN
-  CLOSED
-}
-
 enum ShiftStatus {
   OPEN
   CLOSED
@@ -91,7 +86,6 @@ model Outlet {
 
   floors          Floor[]
   tables          Table[]
-  tableSessions   TableSession[]
   orders          Order[]
   warehouses      Warehouse[]
   users           User[]
@@ -206,30 +200,12 @@ model Table {
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz
 
-  outlet        Outlet         @relation(fields: [outletId], references: [id], onDelete: Restrict)
-  floor         Floor          @relation(fields: [floorId], references: [id], onDelete: Restrict)
-  tableSessions TableSession[]
+  outlet Outlet @relation(fields: [outletId], references: [id], onDelete: Restrict)
+  floor  Floor  @relation(fields: [floorId], references: [id], onDelete: Restrict)
+  orders Order[]
 
   @@unique([outletId, number])
   @@map("tables")
-}
-
-model TableSession {
-  id         String             @id @default(uuid()) @db.Uuid
-  outletId   String             @map("outlet_id") @db.Uuid
-  tableId    String             @map("table_id") @db.Uuid
-  guestCount Int                @default(1) @map("guest_count")
-  status     TableSessionStatus @default(OPEN)
-  openedAt   DateTime           @default(now()) @map("opened_at") @db.Timestamptz
-  closedAt   DateTime?          @map("closed_at") @db.Timestamptz
-  createdAt  DateTime           @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt  DateTime           @updatedAt @map("updated_at") @db.Timestamptz
-
-  outlet Outlet  @relation(fields: [outletId], references: [id], onDelete: Restrict)
-  table  Table   @relation(fields: [tableId], references: [id], onDelete: Restrict)
-  orders Order[]
-
-  @@map("table_sessions")
 }
 
 // ------------------------------------------------------
@@ -317,13 +293,13 @@ model ProductModifierGroup {
 // ------------------------------------------------------
 
 model Order {
-  id             String       @id @default(uuid()) @db.Uuid
-  outletId       String       @map("outlet_id") @db.Uuid
-  tableSessionId String?      @map("table_session_id") @db.Uuid
-  orderNumber    String       @unique @map("order_number") @db.VarChar(100)
-  channel        OrderChannel @default(TABLE)
-  status         OrderStatus  @default(WAITING_PAYMENT)
-  subtotal       Decimal      @db.Decimal(12, 2)
+  id          String       @id @default(uuid()) @db.Uuid
+  outletId    String       @map("outlet_id") @db.Uuid
+  tableId     String?      @map("table_id") @db.Uuid
+  orderNumber String       @unique @map("order_number") @db.VarChar(100)
+  channel     OrderChannel @default(TABLE)
+  status      OrderStatus  @default(WAITING_PAYMENT)
+  subtotal    Decimal      @db.Decimal(12, 2)
   discountAmount Decimal      @default(0) @map("discount_amount") @db.Decimal(12, 2)
   taxAmount      Decimal      @default(0) @map("tax_amount") @db.Decimal(12, 2)
   totalAmount    Decimal      @map("total_amount") @db.Decimal(12, 2)
@@ -334,7 +310,7 @@ model Order {
   cancelledAt    DateTime?    @map("cancelled_at") @db.Timestamptz
 
   outlet             Outlet               @relation(fields: [outletId], references: [id], onDelete: Restrict)
-  tableSession       TableSession?        @relation(fields: [tableSessionId], references: [id], onDelete: SetNull)
+  table              Table?               @relation(fields: [tableId], references: [id], onDelete: SetNull)
   orderItems         OrderItem[]
   payments           Payment[]
   fulfillment        Fulfillment?

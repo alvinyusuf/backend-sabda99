@@ -6,6 +6,7 @@ import {
 import { PrismaService } from '../../../database/prisma.service';
 import { CreateTableDto, UpdateTableDto } from '../dto/table.dto';
 import { randomBytes } from 'crypto';
+import { OrderStatus } from '@prisma/client';
 
 @Injectable()
 export class TablesService {
@@ -47,19 +48,26 @@ export class TablesService {
       where: { outletId },
       include: {
         floor: true,
-        tableSessions: {
-          where: { status: 'OPEN' },
+        orders: {
+          where: {
+            status: {
+              in: [
+                OrderStatus.WAITING_PAYMENT,
+                OrderStatus.CONFIRMED,
+                OrderStatus.SERVED,
+              ],
+            },
+          },
           take: 1,
         },
       },
       orderBy: { number: 'asc' },
     });
 
-    // Map table occupancy status derived from open session
     return tables.map((table) => ({
       ...table,
-      isOccupied: table.tableSessions.length > 0,
-      activeSession: table.tableSessions[0] || null,
+      isOccupied: table.orders.length > 0,
+      activeOrders: table.orders,
     }));
   }
 
@@ -69,10 +77,6 @@ export class TablesService {
       include: {
         outlet: true,
         floor: true,
-        tableSessions: {
-          where: { status: 'OPEN' },
-          take: 1,
-        },
       },
     });
 
@@ -80,10 +84,7 @@ export class TablesService {
       throw new NotFoundException('Table not found or inactive');
     }
 
-    return {
-      ...table,
-      activeSession: table.tableSessions[0] || null,
-    };
+    return table;
   }
 
   async findOne(id: string) {
@@ -91,8 +92,22 @@ export class TablesService {
       where: { id },
       include: {
         floor: true,
-        tableSessions: {
-          where: { status: 'OPEN' },
+        orders: {
+          where: {
+            status: {
+              in: [
+                OrderStatus.WAITING_PAYMENT,
+                OrderStatus.CONFIRMED,
+                OrderStatus.SERVED,
+              ],
+            },
+          },
+          include: {
+            orderItems: true,
+            payments: true,
+            fulfillment: true,
+          },
+          orderBy: { createdAt: 'desc' },
         },
       },
     });

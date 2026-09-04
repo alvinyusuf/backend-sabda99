@@ -11,10 +11,8 @@ import {
 } from '@nestjs/common';
 import { FloorsService } from './services/floors.service';
 import { TablesService } from './services/tables.service';
-import { TableSessionsService } from './services/table-sessions.service';
 import { CreateFloorDto, UpdateFloorDto } from './dto/floor.dto';
 import { CreateTableDto, UpdateTableDto } from './dto/table.dto';
-import { OpenTableSessionDto } from './dto/table-session.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
@@ -24,7 +22,6 @@ export class TablesController {
   constructor(
     private readonly floorsService: FloorsService,
     private readonly tablesService: TablesService,
-    private readonly tableSessionsService: TableSessionsService,
   ) {}
 
   // --------------------------------------------------
@@ -81,6 +78,12 @@ export class TablesController {
     return this.tablesService.findAllByOutlet(outletId);
   }
 
+  @Get('tables/:id')
+  @UseGuards(JwtAuthGuard)
+  async getTable(@Param('id') id: string) {
+    return this.tablesService.findOne(id);
+  }
+
   @Put('tables/:id')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('SUPERADMIN', 'MANAGER')
@@ -100,26 +103,5 @@ export class TablesController {
   @Roles('SUPERADMIN', 'MANAGER')
   async removeTable(@Param('id') id: string) {
     return this.tablesService.remove(id);
-  }
-
-  // --------------------------------------------------
-  // Table Session Endpoints
-  // --------------------------------------------------
-  @Post('table-sessions/open')
-  @UseGuards(JwtAuthGuard)
-  async openSession(@Body() dto: OpenTableSessionDto) {
-    return this.tableSessionsService.openSession(dto);
-  }
-
-  @Get('table-sessions/active/:tableId')
-  @UseGuards(JwtAuthGuard)
-  async getActiveSession(@Param('tableId') tableId: string) {
-    return this.tableSessionsService.getActiveSessionByTable(tableId);
-  }
-
-  @Post('table-sessions/:id/close')
-  @UseGuards(JwtAuthGuard)
-  async closeSession(@Param('id') id: string) {
-    return this.tableSessionsService.closeSession(id);
   }
 }

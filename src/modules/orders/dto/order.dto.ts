@@ -46,7 +46,7 @@ export class CreateOrderDto {
 
   @IsUUID()
   @IsOptional()
-  tableSessionId?: string;
+  tableId?: string;
 
   @IsEnum(OrderChannel)
   @IsOptional()

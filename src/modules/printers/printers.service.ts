@@ -31,11 +31,7 @@ export class PrintersService {
             orderItemModifiers: true,
           },
         },
-        tableSession: {
-          include: {
-            table: true,
-          },
-        },
+        table: true,
       },
     });
 
@@ -76,11 +72,7 @@ export class PrintersService {
                 orderItemModifiers: true,
               },
             },
-            tableSession: {
-              include: {
-                table: true,
-              },
-            },
+            table: true,
           },
         },
       },
@@ -93,7 +85,7 @@ export class PrintersService {
        KITCHEN TICKET
 ================================
 ORDER: #${order.orderNumber}
-TABLE: ${order.tableSession?.table?.number || 'DIRECT/TAKEAWAY'}
+TABLE: ${order.table?.number || 'DIRECT/TAKEAWAY'}
 DATE : ${new Date().toLocaleTimeString('id-ID')}
 PRINT: #${kot.printCount}
 --------------------------------

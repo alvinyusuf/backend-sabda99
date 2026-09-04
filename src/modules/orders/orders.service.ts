@@ -32,20 +32,18 @@ export class OrdersService {
   async createOrder(dto: CreateOrderDto) {
     const channel = dto.channel || OrderChannel.TABLE;
 
-    // Validate Table Session if channel is TABLE
+    // Validate Table if channel is TABLE
     if (channel === OrderChannel.TABLE) {
-      if (!dto.tableSessionId) {
-        throw new BadRequestException(
-          'tableSessionId is required for TABLE orders',
-        );
+      if (!dto.tableId) {
+        throw new BadRequestException('tableId is required for TABLE orders');
       }
 
-      const session = await this.prisma.tableSession.findUnique({
-        where: { id: dto.tableSessionId },
+      const table = await this.prisma.table.findUnique({
+        where: { id: dto.tableId },
       });
 
-      if (!session || session.status !== 'OPEN') {
-        throw new BadRequestException('Invalid or closed table session');
+      if (!table || !table.isActive) {
+        throw new BadRequestException('Invalid or inactive table');
       }
     }
 
@@ -121,7 +119,7 @@ export class OrdersService {
       const order = await tx.order.create({
         data: {
           outletId: dto.outletId,
-          tableSessionId: dto.tableSessionId,
+          tableId: dto.tableId,
           orderNumber: this.generateOrderNumber(),
           channel,
           status: OrderStatus.WAITING_PAYMENT,
@@ -146,11 +144,7 @@ export class OrdersService {
             },
           },
           fulfillment: true,
-          tableSession: {
-            include: {
-              table: true,
-            },
-          },
+          table: true,
         },
       });
 
@@ -177,11 +171,7 @@ export class OrdersService {
         },
         payments: true,
         fulfillment: true,
-        tableSession: {
-          include: {
-            table: true,
-          },
-        },
+        table: true,
       },
       orderBy: { createdAt: 'desc' },
     });
@@ -204,11 +194,7 @@ export class OrdersService {
         },
         fulfillment: true,
         kitchenOrderTickets: true,
-        tableSession: {
-          include: {
-            table: true,
-          },
-        },
+        table: true,
       },
     });
 
@@ -230,11 +216,7 @@ export class OrdersService {
         },
         payments: true,
         fulfillment: true,
-        tableSession: {
-          include: {
-            table: true,
-          },
-        },
+        table: true,
       },
     });
 

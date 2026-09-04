@@ -110,3 +110,33 @@ All activities, architectural setups, documentation restructuring, and backend m
 ### ✅ 5. Verification & Testing
 - Executed full project TypeScript build (`npm run build`).
 - **Result**: 100% clean compilation across all modules without any errors or warnings.
+
+---
+
+## [1.1.6] - 2026-09-04
+
+Order ↔ Inventory integration: stock now auto-deducts from recipes when orders are confirmed.
+
+### ✨ Added
+
+- **`InventoryService.consumeStockForOrder(orderId, warehouseId)`** (`src/modules/inventory/inventory.service.ts`):
+  - Fetches order items + modifiers, looks up active `Recipe` per product and `ModifierRecipeItem` per modifier.
+  - Aggregates deductions per inventory item (handles duplicate ingredients across recipes).
+  - Checks sufficient stock — throws `BadRequestException` if any ingredient is short.
+  - Decrements `Stock` balance and creates `StockMovement` records with type `SALE_CONSUMPTION`.
+  - Returns `{ deducted, items: [{ inventoryItemId, deducted }] }`.
+
+### Changed
+
+- **`OrdersService.updateStatus()`** (`src/modules/orders/orders.service.ts`):
+  - When status transitions to `CONFIRMED` (and `confirmedAt` not yet set), automatically calls `inventoryService.consumeStockForOrder()`.
+  - Derives the outlet's first active `Warehouse` from `order.outletId`.
+  - If no warehouse exists, deduction is skipped silently (graceful degradation).
+- **`OrdersModule`** (`src/modules/orders/orders.module.ts`): now imports `InventoryModule`.
+- **`OrdersService` constructor**: now accepts `InventoryService` via NestJS DI.
+
+### Behavior
+
+- Products without recipes: stock is not touched (skip silently).
+- Insufficient stock for any ingredient: entire status update is **rejected** — order stays in its previous state.
+- `StockMovementType.SALE_CONSUMPTION` (previously unused enum value) is now the movement type for order-triggered deductions.

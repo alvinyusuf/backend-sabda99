@@ -4,12 +4,16 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
+import { InventoryService } from '../inventory/inventory.service';
 import { CreateOrderDto, UpdateOrderStatusDto } from './dto/order.dto';
 import { OrderChannel, OrderStatus } from '@prisma/client';
 
 @Injectable()
 export class OrdersService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private inventoryService: InventoryService,
+  ) {}
 
   private generateOrderNumber(): string {
     const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, '');
@@ -233,6 +237,17 @@ export class OrdersService {
       updateData.completedAt = new Date();
     } else if (dto.status === OrderStatus.CANCELLED && !order.cancelledAt) {
       updateData.cancelledAt = new Date();
+    }
+
+    // Auto-deduct stock from recipes when order is confirmed
+    if (dto.status === OrderStatus.CONFIRMED && !order.confirmedAt) {
+      const warehouse = await this.prisma.warehouse.findFirst({
+        where: { outletId: order.outletId, isActive: true },
+      });
+
+      if (warehouse) {
+        await this.inventoryService.consumeStockForOrder(id, warehouse.id);
+      }
     }
 
     return this.prisma.order.update({

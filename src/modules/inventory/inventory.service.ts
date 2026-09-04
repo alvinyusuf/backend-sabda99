@@ -274,6 +274,126 @@ export class InventoryService {
   }
 
   // --------------------------------------------------
+  // Stock Consumption for Orders
+  // --------------------------------------------------
+  async consumeStockForOrder(
+    orderId: string,
+    warehouseId: string,
+  ) {
+    // Fetch the order with full item details + recipes
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      include: {
+        orderItems: {
+          include: {
+            orderItemModifiers: true,
+          },
+        },
+      },
+    });
+
+    if (!order) {
+      throw new NotFoundException(`Order ID ${orderId} not found`);
+    }
+
+    // Build a flat list of { inventoryItemId, quantity } deductions
+    const deductions: { inventoryItemId: string; quantity: number }[] = [];
+
+    for (const item of order.orderItems) {
+      // Find the active recipe for this product
+      const recipe = await this.prisma.recipe.findFirst({
+        where: { productId: item.productId, isActive: true },
+        include: {
+          recipeItems: true,
+        },
+      });
+
+      if (!recipe) {
+        // No recipe configured for this product — skip silently
+        continue;
+      }
+
+      // Each recipe item defines how much of an ingredient is needed per 1 unit of product
+      for (const recipeItem of recipe.recipeItems) {
+        const deductQty = Number(recipeItem.quantity) * Number(item.quantity);
+        deductions.push({
+          inventoryItemId: recipeItem.inventoryItemId,
+          quantity: deductQty,
+        });
+      }
+
+      // Handle modifier recipe items (extra ingredients for modifiers)
+      for (const mod of item.orderItemModifiers) {
+        const modifierRecipe = await this.prisma.modifierRecipeItem.findFirst({
+          where: { modifierId: mod.modifierId },
+        });
+
+        if (modifierRecipe) {
+          const deductQty = Number(modifierRecipe.quantity) * Number(item.quantity);
+          deductions.push({
+            inventoryItemId: modifierRecipe.inventoryItemId,
+            quantity: deductQty,
+          });
+        }
+      }
+    }
+
+    if (deductions.length === 0) {
+      // No recipe items to deduct — return without touching stock
+      return { deducted: 0, items: [] };
+    }
+
+    // Aggregate deductions per inventory item (same item may appear in multiple recipes)
+    const aggregated = new Map<string, number>();
+    for (const d of deductions) {
+      aggregated.set(d.inventoryItemId, (aggregated.get(d.inventoryItemId) || 0) + d.quantity);
+    }
+
+    // Execute in transaction
+    return this.prisma.$transaction(async (tx) => {
+      const results: { inventoryItemId: string; deducted: number }[] = [];
+
+      for (const [inventoryItemId, totalQty] of aggregated.entries()) {
+        const stock = await tx.stock.findUnique({
+          where: {
+            warehouseId_inventoryItemId: {
+              warehouseId,
+              inventoryItemId,
+            },
+          },
+        });
+
+        if (!stock || Number(stock.quantity) < totalQty) {
+          const itemName = inventoryItemId.slice(0, 8);
+          throw new BadRequestException(
+            `Insufficient stock for item ${itemName}... (need ${totalQty}, have ${stock ? Number(stock.quantity) : 0})`,
+          );
+        }
+
+        await tx.stock.update({
+          where: { id: stock.id },
+          data: { quantity: { decrement: totalQty } },
+        });
+
+        await tx.stockMovement.create({
+          data: {
+            warehouseId,
+            inventoryItemId,
+            type: StockMovementType.SALE_CONSUMPTION,
+            quantity: -totalQty,
+            referenceType: 'ORDER',
+            referenceId: orderId,
+          },
+        });
+
+        results.push({ inventoryItemId, deducted: totalQty });
+      }
+
+      return { deducted: results.length, items: results };
+    });
+  }
+
+  // --------------------------------------------------
   // Waste Recording
   // --------------------------------------------------
   async recordWaste(userId: string, dto: RecordWasteDto) {

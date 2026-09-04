@@ -143,6 +143,28 @@ Order ↔ Inventory integration: stock now auto-deducts from recipes when orders
 
 ---
 
+## [2.0.0] - 2026-09-05
+
+Phase 2 plan: Gap Closure. Reference: `frontend/docs/07-implementation/phase-2-gap-closure-plan.md`
+
+### 📄 Backend Endpoints Needed (Phase 2)
+
+| # | Method | Endpoint | Module | Purpose |
+|---|--------|----------|--------|---------|
+| 1 | GET | `/auth/users` | Auth | List users |
+| 2 | PUT | `/auth/users/:id` | Auth | Update user |
+| 3 | DELETE | `/auth/users/:id` | Auth | Deactivate user |
+| 4 | PUT | `/auth/users/:id/roles` | Auth | Assign roles |
+| 5 | GET | `/audit-logs` | Common | List audit logs |
+| 6 | POST | `/purchasing/requests` | Purchasing | Create PR |
+| 7 | GET | `/purchasing/requests` | Purchasing | List PRs |
+| 8 | GET | `/purchasing/requests/:id` | Purchasing | PR detail |
+| 9 | PUT | `/purchasing/requests/:id` | Purchasing | Approve/reject PR |
+| 10 | GET | `/inventory/dashboard` | Inventory | Summary cards data |
+| 11 | GET | `/reports/cogs` | Reporting | COGS aggregation |
+
+---
+
 ## [1.2.0] - 2026-09-05
 
 Audit fix batch: perbaikan 10 temuan dari Comprehensive Re-Audit 2026-09-04.
@@ -228,3 +250,40 @@ Table lock mechanism: prevent duplicate orders on occupied tables. Added QR rege
 - Customer scan QR → can view menu, but cannot submit order if table has active orders.
 - Staff POS login → can always create orders regardless of table lock state.
 - Table unlocks automatically when all active orders reach `COMPLETED` or `CANCELLED` status.
+
+---
+
+## [2.0.0] - 2026-09-05
+
+Phase 2 backend implementation: Purchase Request API. Reference: `frontend/docs/07-implementation/phase-2-gap-closure-plan.md`
+
+### ✨ Added — Phase 2.4.1: Purchase Request API
+
+- **`PurchaseRequestService`** (`src/modules/purchasing/services/purchase-request.service.ts`, baru):
+  - Full CRUD untuk Purchase Requests: create, findAll, findOne, updateStatus.
+  - Auto-generated PR number (format: `PR-YYYYMMDD-XXX`).
+  - Status workflow: `PENDING` → `APPROVED` / `REJECTED`.
+  - Validation: items tidak boleh kosong, status transition hanya dari PENDING.
+
+- **`CreatePurchaseRequestDto` / `UpdatePurchaseRequestDto`** (`src/modules/purchasing/dto/purchase-request.dto.ts`, baru):
+  - `items`: array of `{ inventoryItemId, quantity, uomName }` (min 1 item).
+  - `notes`: optional string.
+  - `status`: enum `PENDING | APPROVED | REJECTED` (untuk update).
+
+- **`PurchasingController`** (`src/modules/purchasing/purchasing.controller.ts`):
+  - `POST /purchasing/requests` — Create purchase request (INVENTORY role).
+  - `GET /purchasing/requests` — List all purchase requests (any authenticated user).
+  - `GET /purchasing/requests/:id` — Get purchase request detail.
+  - `PUT /purchasing/requests/:id` — Update status (approve/reject) — MANAGER/SUPERADMIN only.
+
+- **`PurchasingModule`** (`src/modules/purchasing/purchasing.module.ts`):
+  - Import and provide `PurchaseRequestService`.
+
+### 📋 Endpoints Summary
+
+| Method | Endpoint | Role | Purpose |
+|--------|----------|------|---------|
+| POST | `/purchasing/requests` | INVENTORY | Create purchase request |
+| GET | `/purchasing/requests` | All authenticated | List purchase requests |
+| GET | `/purchasing/requests/:id` | All authenticated | Purchase request detail |
+| PUT | `/purchasing/requests/:id` | MANAGER, SUPERADMIN | Approve/reject PR |

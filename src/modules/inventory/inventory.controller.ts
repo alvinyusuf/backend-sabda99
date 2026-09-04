@@ -1,11 +1,4 @@
-import {
-  Controller,
-  Get,
-  Post,
-  Body,
-  Query,
-  UseGuards,
-} from '@nestjs/common';
+import { Controller, Get, Post, Body, Query, UseGuards } from '@nestjs/common';
 import { InventoryService } from './inventory.service';
 import {
   CreateUomDto,
@@ -71,7 +64,10 @@ export class InventoryController {
     @Query('warehouseId') warehouseId?: string,
     @Query('inventoryItemId') inventoryItemId?: string,
   ) {
-    return this.inventoryService.getStockMovements(warehouseId, inventoryItemId);
+    return this.inventoryService.getStockMovements(
+      warehouseId,
+      inventoryItemId,
+    );
   }
 
   // Operational Actions: Transfer, Opname, Waste

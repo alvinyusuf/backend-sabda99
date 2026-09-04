@@ -95,10 +95,7 @@ export class PaymentsService {
     });
   }
 
-  async confirmCashPayment(
-    paymentId: string,
-    confirmedByUserId: string,
-  ) {
+  async confirmCashPayment(paymentId: string, confirmedByUserId: string) {
     const payment = await this.prisma.payment.findUnique({
       where: { id: paymentId },
       include: { order: true, paymentMethod: true },
@@ -132,10 +129,7 @@ export class PaymentsService {
         where: { orderId: payment.orderId, status: PaymentStatus.PAID },
       });
 
-      const totalPaid = allPaid.reduce(
-        (sum, p) => sum + Number(p.amount),
-        0,
-      );
+      const totalPaid = allPaid.reduce((sum, p) => sum + Number(p.amount), 0);
 
       if (totalPaid >= Number(payment.order.totalAmount)) {
         await tx.order.update({

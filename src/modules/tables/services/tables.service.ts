@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  ConflictException,
+} from '@nestjs/common';
 import { PrismaService } from '../../../database/prisma.service';
 import { CreateTableDto, UpdateTableDto } from '../dto/table.dto';
 import { randomBytes } from 'crypto';
@@ -22,7 +26,9 @@ export class TablesService {
     });
 
     if (existingTable) {
-      throw new ConflictException(`Table number ${dto.number} already exists in this outlet`);
+      throw new ConflictException(
+        `Table number ${dto.number} already exists in this outlet`,
+      );
     }
 
     return this.prisma.table.create({

@@ -1,4 +1,9 @@
-import { Injectable, NotFoundException, ConflictException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  ConflictException,
+  BadRequestException,
+} from '@nestjs/common';
 import { PrismaService } from '../../../database/prisma.service';
 import { OpenTableSessionDto } from '../dto/table-session.dto';
 
@@ -88,7 +93,9 @@ export class TableSessionsService {
     }
 
     if (session.orders.length > 0) {
-      throw new BadRequestException('Cannot close table session with uncompleted or unpaid orders');
+      throw new BadRequestException(
+        'Cannot close table session with uncompleted or unpaid orders',
+      );
     }
 
     return this.prisma.tableSession.update({

@@ -51,7 +51,11 @@ export class TaxService {
 
       if (dto.isActive === true) {
         await tx.tax.updateMany({
-          where: { outletId: existing.outletId, id: { not: id }, isActive: true },
+          where: {
+            outletId: existing.outletId,
+            id: { not: id },
+            isActive: true,
+          },
           data: { isActive: false },
         });
       }

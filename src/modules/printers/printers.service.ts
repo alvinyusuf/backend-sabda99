@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+} from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
 import { CreatePrinterDto, GenerateKotDto } from './dto/printer.dto';
 
@@ -39,8 +43,14 @@ export class PrintersService {
       throw new NotFoundException(`Order ID ${dto.orderId} not found`);
     }
 
-    if (order.status !== 'CONFIRMED' && order.status !== 'SERVED' && order.status !== 'COMPLETED') {
-      throw new BadRequestException('Cannot print KOT for unconfirmed or cancelled orders');
+    if (
+      order.status !== 'CONFIRMED' &&
+      order.status !== 'SERVED' &&
+      order.status !== 'COMPLETED'
+    ) {
+      throw new BadRequestException(
+        'Cannot print KOT for unconfirmed or cancelled orders',
+      );
     }
 
     // Check existing print count

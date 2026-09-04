@@ -1,11 +1,4 @@
-import {
-  Controller,
-  Get,
-  Post,
-  Body,
-  Query,
-  UseGuards,
-} from '@nestjs/common';
+import { Controller, Get, Post, Body, Query, UseGuards } from '@nestjs/common';
 import { PrintersService } from './printers.service';
 import { CreatePrinterDto, GenerateKotDto } from './dto/printer.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';

@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+} from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
 import {
   CreateSupplierDto,
@@ -85,13 +89,17 @@ export class PurchasingService {
     });
 
     if (!po) {
-      throw new NotFoundException(`Purchase Order ID ${dto.purchaseOrderId} not found`);
+      throw new NotFoundException(
+        `Purchase Order ID ${dto.purchaseOrderId} not found`,
+      );
     }
 
     const inventoryItems = await this.prisma.inventoryItem.findMany({
       where: { id: { in: dto.items.map((i) => i.inventoryItemId) } },
     });
-    const inventoryItemById = new Map(inventoryItems.map((item) => [item.id, item]));
+    const inventoryItemById = new Map(
+      inventoryItems.map((item) => [item.id, item]),
+    );
 
     return this.prisma.$transaction(async (tx) => {
       const receiptNumber = this.generateGrNumber();

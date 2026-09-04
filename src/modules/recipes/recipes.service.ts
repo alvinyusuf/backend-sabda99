@@ -71,7 +71,9 @@ export class RecipesService {
     });
 
     if (!recipe) {
-      throw new NotFoundException(`No active recipe found for Product ID ${productId}`);
+      throw new NotFoundException(
+        `No active recipe found for Product ID ${productId}`,
+      );
     }
 
     return recipe;

@@ -47,7 +47,9 @@ export class InventoryService {
     });
 
     if (existing) {
-      throw new ConflictException(`Inventory Item SKU ${dto.sku} already exists`);
+      throw new ConflictException(
+        `Inventory Item SKU ${dto.sku} already exists`,
+      );
     }
 
     return this.prisma.inventoryItem.create({
@@ -113,7 +115,9 @@ export class InventoryService {
   // --------------------------------------------------
   async transferStock(dto: CreateStockTransferDto) {
     if (dto.fromWarehouseId === dto.toWarehouseId) {
-      throw new BadRequestException('Source and destination warehouse cannot be the same');
+      throw new BadRequestException(
+        'Source and destination warehouse cannot be the same',
+      );
     }
 
     return this.prisma.$transaction(async (tx) => {
@@ -276,10 +280,7 @@ export class InventoryService {
   // --------------------------------------------------
   // Stock Consumption for Orders
   // --------------------------------------------------
-  async consumeStockForOrder(
-    orderId: string,
-    warehouseId: string,
-  ) {
+  async consumeStockForOrder(orderId: string, warehouseId: string) {
     // Fetch the order with full item details + recipes
     const order = await this.prisma.order.findUnique({
       where: { id: orderId },
@@ -329,7 +330,8 @@ export class InventoryService {
         });
 
         if (modifierRecipe) {
-          const deductQty = Number(modifierRecipe.quantity) * Number(item.quantity);
+          const deductQty =
+            Number(modifierRecipe.quantity) * Number(item.quantity);
           deductions.push({
             inventoryItemId: modifierRecipe.inventoryItemId,
             quantity: deductQty,
@@ -346,7 +348,10 @@ export class InventoryService {
     // Aggregate deductions per inventory item (same item may appear in multiple recipes)
     const aggregated = new Map<string, number>();
     for (const d of deductions) {
-      aggregated.set(d.inventoryItemId, (aggregated.get(d.inventoryItemId) || 0) + d.quantity);
+      aggregated.set(
+        d.inventoryItemId,
+        (aggregated.get(d.inventoryItemId) || 0) + d.quantity,
+      );
     }
 
     // Execute in transaction

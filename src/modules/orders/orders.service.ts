@@ -8,6 +8,14 @@ import { InventoryService } from '../inventory/inventory.service';
 import { CreateOrderDto, UpdateOrderStatusDto } from './dto/order.dto';
 import { OrderChannel, OrderStatus } from '@prisma/client';
 
+const VALID_ORDER_TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
+  [OrderStatus.WAITING_PAYMENT]: [OrderStatus.CONFIRMED, OrderStatus.CANCELLED],
+  [OrderStatus.CONFIRMED]: [OrderStatus.SERVED, OrderStatus.CANCELLED],
+  [OrderStatus.SERVED]: [OrderStatus.COMPLETED, OrderStatus.CANCELLED],
+  [OrderStatus.COMPLETED]: [],
+  [OrderStatus.CANCELLED]: [],
+};
+
 @Injectable()
 export class OrdersService {
   constructor(
@@ -27,7 +35,9 @@ export class OrdersService {
     // Validate Table Session if channel is TABLE
     if (channel === OrderChannel.TABLE) {
       if (!dto.tableSessionId) {
-        throw new BadRequestException('tableSessionId is required for TABLE orders');
+        throw new BadRequestException(
+          'tableSessionId is required for TABLE orders',
+        );
       }
 
       const session = await this.prisma.tableSession.findUnique({
@@ -49,7 +59,9 @@ export class OrdersService {
       });
 
       if (!product || !product.isActive) {
-        throw new NotFoundException(`Product ID ${itemDto.productId} not found or inactive`);
+        throw new NotFoundException(
+          `Product ID ${itemDto.productId} not found or inactive`,
+        );
       }
 
       const unitPrice = Number(product.price);
@@ -64,7 +76,9 @@ export class OrdersService {
           });
 
           if (!modifier || !modifier.isActive) {
-            throw new NotFoundException(`Modifier ID ${modDto.modifierId} not found or inactive`);
+            throw new NotFoundException(
+              `Modifier ID ${modDto.modifierId} not found or inactive`,
+            );
           }
 
           const priceAdj = Number(modifier.priceAdjustment);
@@ -144,7 +158,11 @@ export class OrdersService {
     });
   }
 
-  async findAll(outletId: string, status?: OrderStatus, channel?: OrderChannel) {
+  async findAll(
+    outletId: string,
+    status?: OrderStatus,
+    channel?: OrderChannel,
+  ) {
     return this.prisma.order.findMany({
       where: {
         outletId,
@@ -230,6 +248,14 @@ export class OrdersService {
   async updateStatus(id: string, dto: UpdateOrderStatusDto) {
     const order = await this.findOne(id);
 
+    // Validate state machine transition
+    const validTransitions = VALID_ORDER_TRANSITIONS[order.status];
+    if (!validTransitions || !validTransitions.includes(dto.status)) {
+      throw new BadRequestException(
+        `Cannot transition from ${order.status} to ${dto.status}. Valid transitions: ${validTransitions?.join(', ') || 'none'}`,
+      );
+    }
+
     const updateData: any = { status: dto.status };
     if (dto.status === OrderStatus.CONFIRMED && !order.confirmedAt) {
       updateData.confirmedAt = new Date();
@@ -239,14 +265,26 @@ export class OrdersService {
       updateData.cancelledAt = new Date();
     }
 
-    // Auto-deduct stock from recipes when order is confirmed
+    // Auto-deduct stock from recipes when order is confirmed — within same transaction
     if (dto.status === OrderStatus.CONFIRMED && !order.confirmedAt) {
       const warehouse = await this.prisma.warehouse.findFirst({
         where: { outletId: order.outletId, isActive: true },
       });
 
       if (warehouse) {
-        await this.inventoryService.consumeStockForOrder(id, warehouse.id);
+        return this.prisma.$transaction(async (tx) => {
+          // Consume stock first (will throw if insufficient)
+          await this.inventoryService.consumeStockForOrder(id, warehouse.id);
+
+          // Then update order status
+          return tx.order.update({
+            where: { id },
+            data: updateData,
+            include: {
+              fulfillment: true,
+            },
+          });
+        });
       }
     }
 

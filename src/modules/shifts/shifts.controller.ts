@@ -1,11 +1,4 @@
-import {
-  Controller,
-  Get,
-  Post,
-  Body,
-  Param,
-  UseGuards,
-} from '@nestjs/common';
+import { Controller, Get, Post, Body, Param, UseGuards } from '@nestjs/common';
 import { ShiftsService } from './shifts.service';
 import {
   OpenShiftDto,
@@ -46,9 +39,10 @@ export class ShiftsController {
 
   @Post(':id/close')
   async closeShift(
+    @CurrentUser('id') userId: string,
     @Param('id') shiftId: string,
     @Body() dto: CloseShiftDto,
   ) {
-    return this.shiftsService.closeShift(shiftId, dto);
+    return this.shiftsService.closeShift(userId, shiftId, dto);
   }
 }

@@ -69,6 +69,12 @@ export class ShiftsService {
       throw new BadRequestException('Shift is not open or does not exist');
     }
 
+    if (shift.userId !== userId) {
+      throw new BadRequestException(
+        'You can only record cash movements on your own shift',
+      );
+    }
+
     return this.prisma.cashMovement.create({
       data: {
         shiftId: dto.shiftId,
@@ -80,7 +86,7 @@ export class ShiftsService {
     });
   }
 
-  async closeShift(shiftId: string, dto: CloseShiftDto) {
+  async closeShift(userId: string, shiftId: string, dto: CloseShiftDto) {
     const shift = await this.prisma.shift.findUnique({
       where: { id: shiftId },
       include: {
@@ -90,6 +96,10 @@ export class ShiftsService {
 
     if (!shift || shift.status !== ShiftStatus.OPEN) {
       throw new BadRequestException('Shift is already closed or invalid');
+    }
+
+    if (shift.userId !== userId) {
+      throw new BadRequestException('You can only close your own shift');
     }
 
     // Calculate total Cash In / Cash Out
@@ -122,7 +132,8 @@ export class ShiftsService {
       0,
     );
 
-    const expectedCash = openingCash + cashSalesTotal + cashInTotal - cashOutTotal;
+    const expectedCash =
+      openingCash + cashSalesTotal + cashInTotal - cashOutTotal;
     const actualCash = dto.actualCash;
     const variance = actualCash - expectedCash;
 

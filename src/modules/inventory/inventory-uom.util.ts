@@ -3,9 +3,9 @@ import { BadRequestException } from '@nestjs/common';
 export interface UomConvertibleItem {
   uomId: string;
   purchaseUomId?: string | null;
-  purchaseConversionFactor?: number | null;
+  purchaseConversionFactor?: number | { toNumber(): number } | any | null;
   recipeUomId?: string | null;
-  recipeConversionFactor?: number | null;
+  recipeConversionFactor?: number | { toNumber(): number } | any | null;
 }
 
 /**
@@ -22,10 +22,12 @@ export function convertToBaseUom(
     return quantity;
   }
   if (givenUomId === item.purchaseUomId && item.purchaseConversionFactor) {
-    return quantity * item.purchaseConversionFactor;
+    const factor = Number(item.purchaseConversionFactor);
+    return quantity * factor;
   }
   if (givenUomId === item.recipeUomId && item.recipeConversionFactor) {
-    return quantity * item.recipeConversionFactor;
+    const factor = Number(item.recipeConversionFactor);
+    return quantity * factor;
   }
   throw new BadRequestException(
     `UoM ${givenUomId} tidak terdaftar untuk item ini (harus salah satu dari UoM Dasar/Beli/Resep item)`,

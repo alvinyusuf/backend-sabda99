@@ -6,7 +6,6 @@ import {
   CreateGoodsReceiptDto,
 } from './dto/purchasing.dto';
 import { StockMovementType } from '@prisma/client';
-import { convertToBaseUom } from '../inventory/inventory-uom.util';
 
 @Injectable()
 export class PurchasingService {
@@ -111,7 +110,6 @@ export class PurchasingService {
               orderedQuantity: i.orderedQuantity,
               receivedQuantity: i.receivedQuantity,
               unitCost: i.unitCost,
-              uomId: i.uomId ?? null,
             })),
           },
         },
@@ -126,23 +124,9 @@ export class PurchasingService {
           );
         }
 
-        const baseQuantity = convertToBaseUom(
-          {
-            uomId: inventoryItem.uomId,
-            purchaseUomId: inventoryItem.purchaseUomId,
-            purchaseConversionFactor: inventoryItem.purchaseConversionFactor
-              ? Number(inventoryItem.purchaseConversionFactor)
-              : null,
-            recipeUomId: inventoryItem.recipeUomId,
-            recipeConversionFactor: inventoryItem.recipeConversionFactor
-              ? Number(inventoryItem.recipeConversionFactor)
-              : null,
-          },
-          item.uomId ?? inventoryItem.uomId,
-          item.receivedQuantity,
-        );
+        const baseQuantity = item.receivedQuantity;
 
-        // Increase Stock (in Base UoM)
+        // Increase Stock
         await tx.stock.upsert({
           where: {
             warehouseId_inventoryItemId: {

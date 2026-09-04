@@ -468,10 +468,13 @@ model Uom {
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz
 
   inventoryItems       InventoryItem[]
+  purchaseUomForItems  InventoryItem[]       @relation("InventoryPurchaseUom")
+  recipeUomForItems    InventoryItem[]       @relation("InventoryRecipeUom")
   recipeItems          RecipeItem[]
   modifierRecipeItems ModifierRecipeItem[]
   purchaseRequestItems PurchaseRequestItem[]
   wasteItems           WasteItem[]
+  goodsReceiptItems    GoodsReceiptItem[]
 
   @@map("uoms")
 }
@@ -488,7 +491,14 @@ model InventoryItem {
   createdAt    DateTime          @default(now()) @map("created_at") @db.Timestamptz
   updatedAt    DateTime          @updatedAt @map("updated_at") @db.Timestamptz
 
+  purchaseUomId            String?  @map("purchase_uom_id") @db.Uuid
+  purchaseConversionFactor Decimal? @map("purchase_conversion_factor") @db.Decimal(12, 6)
+  recipeUomId              String?  @map("recipe_uom_id") @db.Uuid
+  recipeConversionFactor   Decimal? @map("recipe_conversion_factor") @db.Decimal(12, 6)
+
   uom                  Uom                   @relation(fields: [uomId], references: [id], onDelete: Restrict)
+  purchaseUom          Uom?                  @relation("InventoryPurchaseUom", fields: [purchaseUomId], references: [id], onDelete: SetNull)
+  recipeUom            Uom?                  @relation("InventoryRecipeUom", fields: [recipeUomId], references: [id], onDelete: SetNull)
   stocks               Stock[]
   stockMovements       StockMovement[]
   recipeItems          RecipeItem[]
@@ -703,9 +713,11 @@ model GoodsReceiptItem {
   orderedQuantity Decimal @map("ordered_quantity") @db.Decimal(12, 3)
   receivedQuantity Decimal @map("received_quantity") @db.Decimal(12, 3)
   unitCost        Decimal @map("unit_cost") @db.Decimal(12, 2)
+  uomId           String? @map("uom_id") @db.Uuid
 
   goodsReceipt  GoodsReceipt  @relation(fields: [goodsReceiptId], references: [id], onDelete: Cascade)
   inventoryItem InventoryItem @relation(fields: [inventoryItemId], references: [id], onDelete: Restrict)
+  uom           Uom?          @relation(fields: [uomId], references: [id], onDelete: SetNull)
 
   @@map("goods_receipt_items")
 }

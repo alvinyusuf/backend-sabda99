@@ -19,7 +19,6 @@ import { TaxModule } from './modules/tax/tax.module';
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
     ThrottlerModule.forRootAsync({
-      imports: [ConfigService],
       inject: [ConfigService],
       useFactory: (config: ConfigService) => ({
         throttlers: [

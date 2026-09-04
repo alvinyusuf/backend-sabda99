@@ -6,6 +6,7 @@ import {
   CreateGoodsReceiptDto,
 } from './dto/purchasing.dto';
 import { StockMovementType } from '@prisma/client';
+import { convertToBaseUom } from '../inventory/inventory-uom.util';
 
 @Injectable()
 export class PurchasingService {
@@ -88,6 +89,11 @@ export class PurchasingService {
       throw new NotFoundException(`Purchase Order ID ${dto.purchaseOrderId} not found`);
     }
 
+    const inventoryItems = await this.prisma.inventoryItem.findMany({
+      where: { id: { in: dto.items.map((i) => i.inventoryItemId) } },
+    });
+    const inventoryItemById = new Map(inventoryItems.map((item) => [item.id, item]));
+
     return this.prisma.$transaction(async (tx) => {
       const receiptNumber = this.generateGrNumber();
 
@@ -105,6 +111,7 @@ export class PurchasingService {
               orderedQuantity: i.orderedQuantity,
               receivedQuantity: i.receivedQuantity,
               unitCost: i.unitCost,
+              uomId: i.uomId ?? null,
             })),
           },
         },
@@ -112,7 +119,30 @@ export class PurchasingService {
 
       // Update Stock balance and create Purchase Stock Movement for each received item
       for (const item of dto.items) {
-        // Increase Stock
+        const inventoryItem = inventoryItemById.get(item.inventoryItemId);
+        if (!inventoryItem) {
+          throw new NotFoundException(
+            `Inventory Item ID ${item.inventoryItemId} not found`,
+          );
+        }
+
+        const baseQuantity = convertToBaseUom(
+          {
+            uomId: inventoryItem.uomId,
+            purchaseUomId: inventoryItem.purchaseUomId,
+            purchaseConversionFactor: inventoryItem.purchaseConversionFactor
+              ? Number(inventoryItem.purchaseConversionFactor)
+              : null,
+            recipeUomId: inventoryItem.recipeUomId,
+            recipeConversionFactor: inventoryItem.recipeConversionFactor
+              ? Number(inventoryItem.recipeConversionFactor)
+              : null,
+          },
+          item.uomId ?? inventoryItem.uomId,
+          item.receivedQuantity,
+        );
+
+        // Increase Stock (in Base UoM)
         await tx.stock.upsert({
           where: {
             warehouseId_inventoryItemId: {
@@ -120,27 +150,27 @@ export class PurchasingService {
               inventoryItemId: item.inventoryItemId,
             },
           },
-          update: { quantity: { increment: item.receivedQuantity } },
+          update: { quantity: { increment: baseQuantity } },
           create: {
             warehouseId: dto.warehouseId,
             inventoryItemId: item.inventoryItemId,
-            quantity: item.receivedQuantity,
+            quantity: baseQuantity,
           },
         });
 
-        // Record Purchase Stock Movement (+)
+        // Record Purchase Stock Movement (+), in Base UoM
         await tx.stockMovement.create({
           data: {
             warehouseId: dto.warehouseId,
             inventoryItemId: item.inventoryItemId,
             type: StockMovementType.PURCHASE,
-            quantity: item.receivedQuantity,
+            quantity: baseQuantity,
             referenceType: 'GOODS_RECEIPT',
             referenceId: gr.id,
           },
         });
 
-        // Update PO Item received quantity
+        // Update PO Item received quantity (Base UoM, matching PurchaseOrderItem.quantity)
         const poItem = po.purchaseItems.find(
           (pi) => pi.inventoryItemId === item.inventoryItemId,
         );
@@ -149,7 +179,7 @@ export class PurchasingService {
           await tx.purchaseOrderItem.update({
             where: { id: poItem.id },
             data: {
-              receivedQuantity: { increment: item.receivedQuantity },
+              receivedQuantity: { increment: baseQuantity },
             },
           });
         }

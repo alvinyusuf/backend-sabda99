@@ -74,6 +74,10 @@ export class GoodsReceiptItemDto {
   @IsNumber()
   @Min(0)
   unitCost: number;
+
+  @IsUUID()
+  @IsOptional()
+  uomId?: string;
 }
 
 export class CreateGoodsReceiptDto {

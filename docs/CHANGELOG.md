@@ -140,3 +140,26 @@ Order ↔ Inventory integration: stock now auto-deducts from recipes when orders
 - Products without recipes: stock is not touched (skip silently).
 - Insufficient stock for any ingredient: entire status update is **rejected** — order stays in its previous state.
 - `StockMovementType.SALE_CONSUMPTION` (previously unused enum value) is now the movement type for order-triggered deductions.
+
+---
+
+## [1.1.7] - 2026-09-04
+
+Table lock mechanism: prevent duplicate orders on occupied tables. Added QR regeneration support and table detail endpoint.
+
+### ✨ Added
+
+- **`TablesController GET /pos/tables/:id`** — new endpoint for fetching single table detail (was missing, caused "Table Not Found" on the detail page).
+- **`TablesService.findByQrToken()`** — now includes active orders check:
+  - Queries orders with status IN (`WAITING_PAYMENT`, `CONFIRMED`, `SERVED`).
+  - Returns `isOccupied: boolean` and `activeOrders` array alongside the existing table info.
+- **`OrdersService.createOrder()`** — table lock validation:
+  - Before creating a `TABLE` channel order, counts active orders on the target `tableId`.
+  - Throws `BadRequestException("Meja masih memiliki order aktif...")` if count > 0.
+  - Only applies to customer-facing `TABLE` channel orders — staff POS orders are not blocked.
+
+### Behavior
+
+- Customer scan QR → can view menu, but cannot submit order if table has active orders.
+- Staff POS login → can always create orders regardless of table lock state.
+- Table unlocks automatically when all active orders reach `COMPLETED` or `CANCELLED` status.

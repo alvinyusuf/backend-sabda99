@@ -45,6 +45,26 @@ export class OrdersService {
       if (!table || !table.isActive) {
         throw new BadRequestException('Invalid or inactive table');
       }
+
+      // Block new orders if table already has active orders (customer scan QR only)
+      const activeOrderCount = await this.prisma.order.count({
+        where: {
+          tableId: dto.tableId,
+          status: {
+            in: [
+              OrderStatus.WAITING_PAYMENT,
+              OrderStatus.CONFIRMED,
+              OrderStatus.SERVED,
+            ],
+          },
+        },
+      });
+
+      if (activeOrderCount > 0) {
+        throw new BadRequestException(
+          'Meja masih memiliki order aktif. Silakan selesaikan order terlebih dahulu.',
+        );
+      }
     }
 
     // Process order items & fetch prices for SNAPSHOTS

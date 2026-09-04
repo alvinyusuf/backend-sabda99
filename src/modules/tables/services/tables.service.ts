@@ -77,6 +77,23 @@ export class TablesService {
       include: {
         outlet: true,
         floor: true,
+        orders: {
+          where: {
+            status: {
+              in: [
+                OrderStatus.WAITING_PAYMENT,
+                OrderStatus.CONFIRMED,
+                OrderStatus.SERVED,
+              ],
+            },
+          },
+          select: {
+            id: true,
+            orderNumber: true,
+            status: true,
+            totalAmount: true,
+          },
+        },
       },
     });
 
@@ -84,7 +101,11 @@ export class TablesService {
       throw new NotFoundException('Table not found or inactive');
     }
 
-    return table;
+    return {
+      ...table,
+      isOccupied: table.orders.length > 0,
+      activeOrders: table.orders,
+    };
   }
 
   async findOne(id: string) {

@@ -58,6 +58,10 @@ export class InventoryService {
         uomId: dto.uomId,
         cost: dto.cost ?? 0,
         reorderLevel: dto.reorderLevel ?? 0,
+        purchaseUomId: dto.purchaseUomId,
+        purchaseConversionFactor: dto.purchaseConversionFactor,
+        recipeUomId: dto.recipeUomId,
+        recipeConversionFactor: dto.recipeConversionFactor,
       },
       include: { uom: true },
     });

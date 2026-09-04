@@ -52,6 +52,24 @@ export class CreateInventoryItemDto {
   @Min(0)
   @IsOptional()
   reorderLevel?: number;
+  
+  @IsUUID()
+  @IsOptional()
+  purchaseUomId?: string;
+
+  @IsNumber()
+  @Min(0.000001)
+  @IsOptional()
+  purchaseConversionFactor?: number;
+
+  @IsUUID()
+  @IsOptional()
+  recipeUomId?: string;
+
+  @IsNumber()
+  @Min(0.000001)
+  @IsOptional()
+  recipeConversionFactor?: number;
 }
 
 export class CreateWarehouseDto {

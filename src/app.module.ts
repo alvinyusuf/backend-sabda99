@@ -3,6 +3,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { APP_GUARD } from '@nestjs/core';
 import { DatabaseModule } from './database/database.module';
+import { CommonModule } from './common/common.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { TablesModule } from './modules/tables/tables.module';
 import { ProductsModule } from './modules/products/products.module';
@@ -30,6 +31,7 @@ import { TaxModule } from './modules/tax/tax.module';
       }),
     }),
     DatabaseModule,
+    CommonModule,
     AuthModule,
     TablesModule,
     ProductsModule,

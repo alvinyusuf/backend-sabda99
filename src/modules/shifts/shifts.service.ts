@@ -57,7 +57,39 @@ export class ShiftsService {
       throw new NotFoundException('No active open shift found for this user');
     }
 
-    return shift;
+    // Calculate cash totals
+    const cashInTotal = shift.cashMovements
+      .filter((m) => m.type === 'CASH_IN')
+      .reduce((sum, m) => sum + Number(m.amount), 0);
+
+    const cashOutTotal = shift.cashMovements
+      .filter((m) => m.type === 'CASH_OUT')
+      .reduce((sum, m) => sum + Number(m.amount), 0);
+
+    // Fetch cash payments confirmed during this shift time window
+    const cashPayments = await this.prisma.payment.findMany({
+      where: {
+        confirmedById: shift.userId,
+        confirmedAt: {
+          gte: shift.openedAt,
+        },
+        paymentMethod: {
+          type: 'CASH',
+        },
+      },
+    });
+
+    const cashSalesTotal = cashPayments.reduce(
+      (sum, p) => sum + Number(p.amount),
+      0,
+    );
+
+    return {
+      ...shift,
+      cashInTotal,
+      cashOutTotal,
+      cashSalesTotal,
+    };
   }
 
   async recordCashMovement(userId: string, dto: CreateCashMovementDto) {

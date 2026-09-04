@@ -5,6 +5,7 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
 import { InventoryService } from '../inventory/inventory.service';
+import { AuditLogService } from '../../common/services/audit-log.service';
 import { CreateOrderDto, UpdateOrderStatusDto } from './dto/order.dto';
 import { OrderChannel, OrderStatus } from '@prisma/client';
 
@@ -21,6 +22,7 @@ export class OrdersService {
   constructor(
     private prisma: PrismaService,
     private inventoryService: InventoryService,
+    private auditLogService: AuditLogService,
   ) {}
 
   private generateOrderNumber(): string {
@@ -168,6 +170,19 @@ export class OrdersService {
         },
       });
 
+      // Log order creation
+      await this.auditLogService.log({
+        outletId: dto.outletId,
+        action: 'CREATED',
+        entityType: 'ORDER',
+        entityId: order.id,
+        metadata: {
+          orderNumber: order.orderNumber,
+          channel,
+          totalAmount,
+        },
+      });
+
       return order;
     });
   }
@@ -276,26 +291,56 @@ export class OrdersService {
       if (warehouse) {
         return this.prisma.$transaction(async (tx) => {
           // Consume stock first (will throw if insufficient)
-          await this.inventoryService.consumeStockForOrder(id, warehouse.id);
+          await this.inventoryService.consumeStockForOrder(id, warehouse.id, tx);
 
           // Then update order status
-          return tx.order.update({
+          const updatedOrder = await tx.order.update({
             where: { id },
             data: updateData,
             include: {
               fulfillment: true,
             },
           });
+
+          // Log order status change
+          await this.auditLogService.log({
+            outletId: order.outletId,
+            action: 'STATUS_CHANGED',
+            entityType: 'ORDER',
+            entityId: id,
+            metadata: {
+              orderNumber: order.orderNumber,
+              fromStatus: order.status,
+              toStatus: dto.status,
+            },
+          });
+
+          return updatedOrder;
         });
       }
     }
 
-    return this.prisma.order.update({
+    const updatedOrder = await this.prisma.order.update({
       where: { id },
       data: updateData,
       include: {
         fulfillment: true,
       },
     });
+
+    // Log order status change
+    await this.auditLogService.log({
+      outletId: order.outletId,
+      action: 'STATUS_CHANGED',
+      entityType: 'ORDER',
+      entityId: id,
+      metadata: {
+        orderNumber: order.orderNumber,
+        fromStatus: order.status,
+        toStatus: dto.status,
+      },
+    });
+
+    return updatedOrder;
   }
 }

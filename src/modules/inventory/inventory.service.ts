@@ -280,9 +280,15 @@ export class InventoryService {
   // --------------------------------------------------
   // Stock Consumption for Orders
   // --------------------------------------------------
-  async consumeStockForOrder(orderId: string, warehouseId: string) {
+  async consumeStockForOrder(
+    orderId: string,
+    warehouseId: string,
+    tx?: any, // Optional transaction client
+  ) {
+    const prisma = tx || this.prisma;
+
     // Fetch the order with full item details + recipes
-    const order = await this.prisma.order.findUnique({
+    const order = await prisma.order.findUnique({
       where: { id: orderId },
       include: {
         orderItems: {
@@ -302,7 +308,7 @@ export class InventoryService {
 
     for (const item of order.orderItems) {
       // Find the active recipe for this product
-      const recipe = await this.prisma.recipe.findFirst({
+      const recipe = await prisma.recipe.findFirst({
         where: { productId: item.productId, isActive: true },
         include: {
           recipeItems: true,
@@ -325,7 +331,7 @@ export class InventoryService {
 
       // Handle modifier recipe items (extra ingredients for modifiers)
       for (const mod of item.orderItemModifiers) {
-        const modifierRecipe = await this.prisma.modifierRecipeItem.findFirst({
+        const modifierRecipe = await prisma.modifierRecipeItem.findFirst({
           where: { modifierId: mod.modifierId },
         });
 
@@ -354,48 +360,45 @@ export class InventoryService {
       );
     }
 
-    // Execute in transaction
-    return this.prisma.$transaction(async (tx) => {
-      const results: { inventoryItemId: string; deducted: number }[] = [];
+    const results: { inventoryItemId: string; deducted: number }[] = [];
 
-      for (const [inventoryItemId, totalQty] of aggregated.entries()) {
-        const stock = await tx.stock.findUnique({
-          where: {
-            warehouseId_inventoryItemId: {
-              warehouseId,
-              inventoryItemId,
-            },
-          },
-        });
-
-        if (!stock || Number(stock.quantity) < totalQty) {
-          const itemName = inventoryItemId.slice(0, 8);
-          throw new BadRequestException(
-            `Insufficient stock for item ${itemName}... (need ${totalQty}, have ${stock ? Number(stock.quantity) : 0})`,
-          );
-        }
-
-        await tx.stock.update({
-          where: { id: stock.id },
-          data: { quantity: { decrement: totalQty } },
-        });
-
-        await tx.stockMovement.create({
-          data: {
+    for (const [inventoryItemId, totalQty] of aggregated.entries()) {
+      const stock = await prisma.stock.findUnique({
+        where: {
+          warehouseId_inventoryItemId: {
             warehouseId,
             inventoryItemId,
-            type: StockMovementType.SALE_CONSUMPTION,
-            quantity: -totalQty,
-            referenceType: 'ORDER',
-            referenceId: orderId,
           },
-        });
+        },
+      });
 
-        results.push({ inventoryItemId, deducted: totalQty });
+      if (!stock || Number(stock.quantity) < totalQty) {
+        const itemName = inventoryItemId.slice(0, 8);
+        throw new BadRequestException(
+          `Insufficient stock for item ${itemName}... (need ${totalQty}, have ${stock ? Number(stock.quantity) : 0})`,
+        );
       }
 
-      return { deducted: results.length, items: results };
-    });
+      await prisma.stock.update({
+        where: { id: stock.id },
+        data: { quantity: { decrement: totalQty } },
+      });
+
+      await prisma.stockMovement.create({
+        data: {
+          warehouseId,
+          inventoryItemId,
+          type: StockMovementType.SALE_CONSUMPTION,
+          quantity: -totalQty,
+          referenceType: 'ORDER',
+          referenceId: orderId,
+        },
+      });
+
+      results.push({ inventoryItemId, deducted: totalQty });
+    }
+
+    return { deducted: results.length, items: results };
   }
 
   // --------------------------------------------------

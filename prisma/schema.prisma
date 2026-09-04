@@ -123,6 +123,7 @@ model User {
   wastes               Waste[]
   cashMovementsCreated CashMovement[]
   auditLogs            AuditLog[]
+  refreshTokens        RefreshToken[]
 
   @@map("users")
 }
@@ -869,4 +870,16 @@ model AuditLog {
   user   User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
 
   @@map("audit_logs")
+}
+
+model RefreshToken {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  token     String   @unique @db.Text
+  expiresAt DateTime @map("expires_at") @db.Timestamptz
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("refresh_tokens")
 }

@@ -143,6 +143,71 @@ Order ↔ Inventory integration: stock now auto-deducts from recipes when orders
 
 ---
 
+## [1.2.0] - 2026-09-05
+
+Audit fix batch: perbaikan 10 temuan dari Comprehensive Re-Audit 2026-09-04.
+
+### 🔒 Security Fixes
+
+- **CORS configuration** (`src/main.ts`):
+  - CORS origins sekarang menggunakan `CORS_ORIGINS` env var (comma-separated).
+  - Jika `CORS_ORIGINS` tidak diset, akan fallback ke `http://localhost:3000` di development dan throw error di production.
+  - Added warning log saat CORS_ORIGINS tidak diset di development.
+
+- **Security headers via helmet** (`src/main.ts`):
+  - Install `helmet` package.
+  - Tambah `app.use(helmet())` untuk HTTP security headers (X-Content-Type-Options, X-Frame-Options, dll).
+
+- **Token refresh mechanism** (`src/modules/auth/`):
+  - Tambah model `RefreshToken` di Prisma schema (`prisma/schema.prisma`).
+  - Tambah `refreshTokens` relation di `User` model.
+  - `AuthService.login()` sekarang mengembalikan `refreshToken` bersama `accessToken`.
+  - Tambah endpoint `POST /auth/refresh` — menukar refresh token lama dengan token baru (rotate pattern).
+  - Tambah endpoint `POST /auth/logout` — menghapus refresh token dari database.
+  - Tambah `JWT_REFRESH_EXPIRES_IN` env var (default: `30d`).
+
+### 🐛 Data Integrity Fixes
+
+- **Nested transaction untuk stock consumption** (`src/modules/inventory/inventory.service.ts`):
+  - `consumeStockForOrder()` sekarang menerima optional `tx` (Prisma transaction client) parameter.
+  - Jika `tx` disediakan, method menggunakan transaction client tersebut (tidak buka transaction baru).
+  - Jika `tx` tidak disediakan, tetap membuka transaction sendiri (backward compatible).
+
+- **Order status state machine** (`src/modules/orders/orders.service.ts`):
+  - Sudah terimplementasi sebelumnya dengan `VALID_ORDER_TRANSITIONS` map dan validasi di `updateStatus()`.
+  - Transisi invalid sekarang throw `BadRequestException` dengan pesan transisi yang valid.
+
+### ✨ AuditLog Service
+
+- **`AuditLogService`** (`src/common/services/audit-log.service.ts`, baru):
+  - Service untuk menulis audit logs ke database via `AuditLog` model.
+  - Method `log(params)` dan `logAction(action, entityType, entityId, userId?, outletId?, metadata?)`.
+  - Error handling: kegagalan menulis audit log tidak mempengaruhi operasi utama.
+
+- **`CommonModule`** (`src/common/common.module.ts`, baru):
+  - Global module yang export `AuditLogService`.
+  - Diimport di `AppModule` untuk digunakan di semua module.
+
+- **Audit logging di `OrdersService`** (`src/modules/orders/orders.service.ts`):
+  - `createOrder()` — log `CREATED` dengan order number, channel, total amount.
+  - `updateStatus()` — log `STATUS_CHANGED` dengan from/to status.
+
+### 🔧 Shift Service Enhancement
+
+- **Cash totals di `getCurrentShift()`** (`src/modules/shifts/shifts.service.ts`):
+  - Response sekarang menyertakan `cashInTotal`, `cashOutTotal`, dan `cashSalesTotal`.
+  - Cash Sales dihitung dari payment confirmed dengan payment method type `CASH` dalam shift time window.
+
+### 📦 Dependencies
+
+- Tambah `helmet` ke `package.json` (backend).
+
+### 📋 Config
+
+- `.env`: tambah `JWT_REFRESH_EXPIRES_IN="30d"` dan `CORS_ORIGINS="http://localhost:3000"`.
+
+---
+
 ## [1.1.7] - 2026-09-04
 
 Table lock mechanism: prevent duplicate orders on occupied tables. Added QR regeneration support and table detail endpoint.

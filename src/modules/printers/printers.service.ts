@@ -37,9 +37,29 @@ export class PrintersService {
     });
   }
 
-  async findPrintersByOutlet(outletId: string) {
-    return this.prisma.printer.findMany({
-      where: { outletId, isActive: true },
+  async findPrintersByOutlet(outletId?: string) {
+    const where: any = { isActive: true };
+    if (outletId) where.outletId = outletId;
+    return this.prisma.printer.findMany({ where });
+  }
+
+  async updatePrinter(id: string, dto: Partial<CreatePrinterDto>) {
+    const printer = await this.prisma.printer.findUnique({ where: { id } });
+    if (!printer) throw new NotFoundException(`Printer with ID ${id} not found`);
+
+    return this.prisma.printer.update({
+      where: { id },
+      data: dto,
+    });
+  }
+
+  async deletePrinter(id: string) {
+    const printer = await this.prisma.printer.findUnique({ where: { id } });
+    if (!printer) throw new NotFoundException(`Printer with ID ${id} not found`);
+
+    return this.prisma.printer.update({
+      where: { id },
+      data: { isActive: false },
     });
   }
 

@@ -4,6 +4,25 @@ All activities, architectural setups, documentation restructuring, and backend m
 
 ---
 
+## [2.2.0] - 2026-09-06
+
+Phase 2 gap closure completion: User Management, Printer Management, and Audit Log Viewer APIs. Reference: `frontend/docs/07-implementation/phase-2-gap-closure-plan.md`
+
+### ✨ Added
+
+- **User Management Endpoints (`AuthModule`)**:
+  - `GET /auth/users`: Fetch list of all system users with their assigned roles (SUPERADMIN, MANAGER only).
+  - `PUT /auth/users/:id`: Update user info (name, email, active status, or reset password).
+  - `PUT /auth/users/:id/roles`: Assign/update system roles for a specific user.
+  - `DELETE /auth/users/:id`: Soft delete / deactivate user account.
+- **Printer Management Endpoints (`PrintersModule`)**:
+  - `PUT /printers/:id`: Update thermal printer configuration (name, type, address/IP).
+  - `DELETE /printers/:id`: Deactivate printer.
+- **Audit Log Viewer Endpoints (`CommonModule`)**:
+  - `GET /audit-logs`: Fetch system audit logs with optional filters (`outletId`, `userId`, `action`, `entityType`).
+
+---
+
 ## [1.0.0] - 2026-09-03
 
 ### 📁 1. Single Source of Truth (SSOT) & Documentation Restructuring

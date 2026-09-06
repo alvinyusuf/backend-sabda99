@@ -213,4 +213,130 @@ export class AuthService {
       roles: newUser.userRoles.map((ur) => ur.role.name),
     };
   }
+
+  async findAllUsers() {
+    const users = await this.prisma.user.findMany({
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        isActive: true,
+        outletId: true,
+        createdAt: true,
+        updatedAt: true,
+        userRoles: {
+          select: {
+            role: {
+              select: {
+                id: true,
+                name: true,
+                description: true,
+              },
+            },
+          },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    return users.map((u) => ({
+      id: u.id,
+      name: u.name,
+      email: u.email,
+      isActive: u.isActive,
+      outletId: u.outletId,
+      createdAt: u.createdAt,
+      updatedAt: u.updatedAt,
+      roles: u.userRoles.map((ur) => ur.role.name),
+    }));
+  }
+
+  async updateUser(id: string, dto: { name?: string; email?: string; isActive?: boolean; password?: string }) {
+    const user = await this.prisma.user.findUnique({ where: { id } });
+    if (!user) throw new NotFoundException(`User with ID ${id} not found`);
+
+    const data: any = {};
+    if (dto.name !== undefined) data.name = dto.name;
+    if (dto.email !== undefined) {
+      if (dto.email !== user.email) {
+        const existing = await this.prisma.user.findUnique({ where: { email: dto.email } });
+        if (existing) throw new ConflictException('Email is already in use');
+      }
+      data.email = dto.email;
+    }
+    if (dto.isActive !== undefined) data.isActive = dto.isActive;
+    if (dto.password) {
+      data.passwordHash = await bcrypt.hash(dto.password, 10);
+    }
+
+    const updated = await this.prisma.user.update({
+      where: { id },
+      data,
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        isActive: true,
+        outletId: true,
+        userRoles: {
+          select: {
+            role: {
+              select: {
+                name: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    return {
+      id: updated.id,
+      name: updated.name,
+      email: updated.email,
+      isActive: updated.isActive,
+      outletId: updated.outletId,
+      roles: updated.userRoles.map((ur) => ur.role.name),
+    };
+  }
+
+  async updateUserRoles(id: string, roleNames: string[]) {
+    const user = await this.prisma.user.findUnique({ where: { id } });
+    if (!user) throw new NotFoundException(`User with ID ${id} not found`);
+
+    // Verify all roles exist
+    const roles = await this.prisma.role.findMany({
+      where: { name: { in: roleNames } },
+    });
+
+    if (roles.length !== roleNames.length) {
+      throw new NotFoundException('One or more roles not found');
+    }
+
+    // Replace user roles inside transaction
+    await this.prisma.$transaction(async (tx) => {
+      await tx.userRole.deleteMany({ where: { userId: id } });
+      await tx.userRole.createMany({
+        data: roles.map((r) => ({
+          userId: id,
+          roleId: r.id,
+        })),
+      });
+    });
+
+    return this.findAllUsers().then((users) => users.find((u) => u.id === id));
+  }
+
+  async deleteUser(id: string) {
+    const user = await this.prisma.user.findUnique({ where: { id } });
+    if (!user) throw new NotFoundException(`User with ID ${id} not found`);
+
+    // Soft delete by setting isActive to false
+    await this.prisma.user.update({
+      where: { id },
+      data: { isActive: false },
+    });
+
+    return { success: true, message: 'User deactivated successfully' };
+  }
 }

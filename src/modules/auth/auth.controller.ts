@@ -1,4 +1,4 @@
-import { Controller, Post, Body, Get, UseGuards } from '@nestjs/common';
+import { Controller, Post, Body, Get, UseGuards, Put, Delete, Param } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';
 import { RegisterUserDto } from './dto/register.dto';
@@ -31,6 +31,40 @@ export class AuthController {
   @Roles('SUPERADMIN', 'MANAGER')
   async register(@Body() dto: RegisterUserDto) {
     return this.authService.registerUser(dto);
+  }
+
+  @Get('users')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('SUPERADMIN', 'MANAGER')
+  async getAllUsers() {
+    return this.authService.findAllUsers();
+  }
+
+  @Put('users/:id')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('SUPERADMIN', 'MANAGER')
+  async updateUser(
+    @Param('id') id: string,
+    @Body() dto: { name?: string; email?: string; isActive?: boolean; password?: string },
+  ) {
+    return this.authService.updateUser(id, dto);
+  }
+
+  @Put('users/:id/roles')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('SUPERADMIN', 'MANAGER')
+  async updateUserRoles(
+    @Param('id') id: string,
+    @Body('roles') roles: string[],
+  ) {
+    return this.authService.updateUserRoles(id, roles);
+  }
+
+  @Delete('users/:id')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('SUPERADMIN', 'MANAGER')
+  async deleteUser(@Param('id') id: string) {
+    return this.authService.deleteUser(id);
   }
 
   @Get('me')

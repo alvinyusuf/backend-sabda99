@@ -51,4 +51,23 @@ export class AuditLogService {
       metadata,
     });
   }
+
+  async findAll(query?: { outletId?: string; userId?: string; action?: string; entityType?: string }) {
+    const where: any = {};
+    if (query?.outletId) where.outletId = query.outletId;
+    if (query?.userId) where.userId = query.userId;
+    if (query?.action) where.action = query.action;
+    if (query?.entityType) where.entityType = query.entityType;
+
+    return this.prisma.auditLog.findMany({
+      where,
+      include: {
+        user: {
+          select: { id: true, name: true, email: true },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 100,
+    });
+  }
 }

@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Query, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Put, Delete, Body, Query, Param, UseGuards } from '@nestjs/common';
 import { PrintersService } from './printers.service';
 import { CreatePrinterDto, GenerateKotDto } from './dto/printer.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
@@ -19,8 +19,22 @@ export class PrintersController {
   }
 
   @Get()
-  async getPrinters(@Query('outletId') outletId: string) {
+  async getPrinters(@Query('outletId') outletId?: string) {
     return this.printersService.findPrintersByOutlet(outletId);
+  }
+
+  @Put(':id')
+  @UseGuards(RolesGuard)
+  @Roles('SUPERADMIN', 'MANAGER')
+  async updatePrinter(@Param('id') id: string, @Body() dto: Partial<CreatePrinterDto>) {
+    return this.printersService.updatePrinter(id, dto);
+  }
+
+  @Delete(':id')
+  @UseGuards(RolesGuard)
+  @Roles('SUPERADMIN', 'MANAGER')
+  async deletePrinter(@Param('id') id: string) {
+    return this.printersService.deletePrinter(id);
   }
 
   @Post('generate-kot')

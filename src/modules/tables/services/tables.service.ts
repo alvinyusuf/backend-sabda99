@@ -43,9 +43,12 @@ export class TablesService {
     });
   }
 
-  async findAllByOutlet(outletId: string) {
+  async findAllByOutlet(outletId: string, includeInactive = false) {
     const tables = await this.prisma.table.findMany({
-      where: { outletId },
+      where: {
+        outletId,
+        ...(includeInactive ? {} : { isActive: true }),
+      },
       include: {
         floor: true,
         orders: {
@@ -158,10 +161,11 @@ export class TablesService {
     });
   }
 
-  async remove(id: string) {
+  async toggleActive(id: string, isActive: boolean) {
     await this.findOne(id);
-    return this.prisma.table.delete({
+    return this.prisma.table.update({
       where: { id },
+      data: { isActive },
     });
   }
 }

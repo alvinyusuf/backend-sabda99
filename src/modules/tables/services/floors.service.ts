@@ -16,11 +16,16 @@ export class FloorsService {
     });
   }
 
-  async findAllByOutlet(outletId: string) {
+  async findAllByOutlet(outletId: string, includeInactive = false) {
     return this.prisma.floor.findMany({
-      where: { outletId },
+      where: {
+        outletId,
+        ...(includeInactive ? {} : { isActive: true }),
+      },
       include: {
-        tables: true,
+        tables: {
+          where: includeInactive ? {} : { isActive: true },
+        },
       },
       orderBy: { createdAt: 'asc' },
     });
@@ -47,10 +52,11 @@ export class FloorsService {
     });
   }
 
-  async remove(id: string) {
+  async toggleActive(id: string, isActive: boolean) {
     await this.findOne(id);
-    return this.prisma.floor.delete({
+    return this.prisma.floor.update({
       where: { id },
+      data: { isActive },
     });
   }
 }

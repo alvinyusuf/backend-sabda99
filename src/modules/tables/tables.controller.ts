@@ -3,7 +3,6 @@ import {
   Get,
   Post,
   Put,
-  Delete,
   Body,
   Param,
   UseGuards,
@@ -55,11 +54,14 @@ export class TablesController {
     return this.floorsService.update(id, dto);
   }
 
-  @Delete('floors/:id')
+  @Put('floors/:id/toggle')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('SUPERADMIN', 'MANAGER')
-  async removeFloor(@Param('id') id: string) {
-    return this.floorsService.remove(id);
+  async toggleFloor(
+    @Param('id') id: string,
+    @Body('isActive') isActive: boolean,
+  ) {
+    return this.floorsService.toggleActive(id, isActive);
   }
 
   // --------------------------------------------------
@@ -98,10 +100,13 @@ export class TablesController {
     return this.tablesService.regenerateQrToken(id);
   }
 
-  @Delete('tables/:id')
+  @Put('tables/:id/toggle')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('SUPERADMIN', 'MANAGER')
-  async removeTable(@Param('id') id: string) {
-    return this.tablesService.remove(id);
+  async toggleTable(
+    @Param('id') id: string,
+    @Body('isActive') isActive: boolean,
+  ) {
+    return this.tablesService.toggleActive(id, isActive);
   }
 }

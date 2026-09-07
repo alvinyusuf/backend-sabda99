@@ -4,6 +4,61 @@ All activities, architectural setups, documentation restructuring, and backend m
 
 ---
 
+## [2.3.0] - 2026-09-07
+
+Audit Round 21 fixes — new endpoints, schema changes, permissions guard. Reference: `docs/audit/21-implementation-plan.md`
+
+### ✨ Added
+
+- **`GET /inventory/dashboard`** (`src/modules/inventory/`):
+  - Returns `totalItems`, `totalStockValue`, `lowStockCount`, `recentMovements`.
+  - Guard: `SUPERADMIN`, `MANAGER`, `INVENTORY`.
+
+- **Reports Module** (`src/modules/reports/`, baru):
+  - `GET /reports/cogs` — menghitung COGS per produk berdasarkan resep dan biaya bahan baku.
+  - Guard: `SUPERADMIN`, `MANAGER`.
+  - Registered di `AppModule`.
+
+- **UoM Conversion** (`prisma/schema.prisma`):
+  - Field `conversionFactor` (Decimal 12,4, default 1) ditambahkan ke model `Uom`.
+  - Self-relation `baseUomId` / `baseUom` / `childUoms` untuk konversi satuan.
+
+- **Granular Permissions Guard** (`src/common/`):
+  - `@Permissions(...)` decorator baru di `decorators/permissions.decorator.ts`.
+  - `RolesGuard` diupdate untuk query `role_permissions` table saat `@Permissions` digunakan.
+
+- **CRUD Endpoints Baru**:
+  - `PUT/DELETE /inventory/uoms/:id` — update/hapus UoM.
+  - `PUT/DELETE /inventory/items/:id` — update/hapus inventory item (soft delete).
+  - `PUT/DELETE /inventory/warehouses/:id` — update/hapus warehouse (soft delete).
+  - `PUT/DELETE /payments/methods/:id` — update/hapus payment method (soft delete).
+  - `DELETE /taxes/:id` — hapus pajak (hard delete).
+  - `PUT/DELETE /purchasing/suppliers/:id` — update/hapus supplier.
+
+### Changed
+- `InventoryController`: import `Param`, `Put`, `Delete`.
+- `PaymentsController`: import `Put`, `Delete`.
+- `TaxController`: import `Delete`.
+- `PurchasingController`: import `Delete`.
+- `PaymentsService.updateMethod()`: handle enum `PaymentMethodType` casting.
+- `RolesGuard`: sekarang async, inject `PrismaService`, cek permission-level saat `@Permissions` ada.
+
+### Documentation
+- `frontend/docs/CHANGELOG.md`: ditulis ulang (sebelumnya identik dengan backend).
+- `backend/docs/01-architecture/01-foundation.md`: "Table and Table Session" → "Table Lock Mechanism".
+- `backend/docs/01-architecture/02-domain-model.md`: hapus referensi `TableSession` dari aggregate roots dan domain classification.
+- `backend/docs/06-implementation/system-documentation.md`: `tableSessionId` → `tableId`.
+- `backend/docs/02-database/erd.md`: referensi `TableSession` dipertahankan (historical record).
+
+### Testing
+- Jest configured (`jest` di `package.json`).
+- `src/modules/inventory/inventory.service.spec.ts`: 3 tests (create UoM, duplicate code, findAllUoms).
+
+### Dependencies
+- `@vitejs/plugin-react` (frontend, untuk Vitest).
+
+---
+
 ## [2.2.0] - 2026-09-06
 
 Phase 2 gap closure completion: User Management, Printer Management, and Audit Log Viewer APIs. Reference: `frontend/docs/07-implementation/phase-2-gap-closure-plan.md`

@@ -445,12 +445,16 @@ model KitchenOrderTicket {
 // ------------------------------------------------------
 
 model Uom {
-  id        String   @id @default(uuid()) @db.Uuid
-  code      String   @unique @db.VarChar(20)
-  name      String   @db.VarChar(100)
-  type      String   @db.VarChar(50)
-  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz
+  id               String   @id @default(uuid()) @db.Uuid
+  code             String   @unique @db.VarChar(20)
+  name             String   @db.VarChar(100)
+  type             String   @db.VarChar(50)
+  conversionFactor Decimal  @default(1) @db.Decimal(12, 4) @map("conversion_factor")
+  baseUomId        String?  @db.Uuid @map("base_uom_id")
+  baseUom          Uom?     @relation("UomConversion", fields: [baseUomId], references: [id])
+  childUoms        Uom[]    @relation("UomConversion")
+  createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt        DateTime @updatedAt @map("updated_at") @db.Timestamptz
 
   inventoryItems       InventoryItem[]
   recipeItems          RecipeItem[]

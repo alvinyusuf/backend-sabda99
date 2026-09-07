@@ -273,49 +273,29 @@ Cashier does not need to manually confirm a successfully verified online payment
 
 ---
 
-# 5. Table and Table Session
+# 5. Table Lock Mechanism
 
-A table is a physical location.
+A table is a physical location that can be occupied by customers.
 
-A **Table Session** represents a customer's active dining/order session at that table.
-
-This distinction is important because one table can have multiple orders during the same visit.
-
-Example:
+Table occupancy is determined by the **presence of active orders** on that table. There is no separate "Table Session" entity — the table lock is derived from order status:
 
 ```text
 TABLE 05
    │
-   └── SESSION #20260902-005
+   └── Active Orders (status IN: WAITING_PAYMENT, CONFIRMED, SERVED)
            │
            ├── ORDER #001
            │
            └── ORDER #002
 ```
 
-Customer may order again later:
+When all active orders reach `COMPLETED` or `CANCELLED`, the table is automatically unlocked.
 
-```text
-Order #001
-2x Kopi Susu
-1x Croissant
-
-Order #002
-1x Americano
-1x French Fries
-```
-
-Both belong to the same active table session.
-
-This is important for:
-
-- Multiple rounds of ordering
-- Outstanding balance
-- Split bill
-- Merge bill
-- Table occupancy
-- Final payment
-- Closing the table session
+This approach:
+- Eliminates the need for explicit session open/close lifecycle
+- Prevents duplicate orders via `OrdersService.createOrder()` validation
+- Allows multiple rounds of ordering while the table is occupied
+- Simplifies the domain model
 
 ---
 
@@ -1151,7 +1131,7 @@ Keep these concepts separate.
 Use:
 
 ```text
-Table → Table Session → Multiple Orders
+Table → Table Lock → Multiple Orders
 ```
 
 ### ❌ Do not implement detailed kitchen states unless someone actually operates them
@@ -1184,14 +1164,14 @@ Incoming Order
 → Order Monitoring
 ```
 
-## Priority 3 — Table Session
+## Priority 3 — Table Lock
 
 ```text
 Table
-→ Active Session
+→ Active Orders
 → Multiple Orders
 → Outstanding Bill
-→ Close Session
+→ Table Unlocks Automatically
 ```
 
 ## Priority 4 — Inventory
@@ -1338,7 +1318,6 @@ The next concrete artifact should be the **domain/entity model and ERD**, especi
 
 ```text
 Table
-Table Session
 Order
 Order Item
 Modifier

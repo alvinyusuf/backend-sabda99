@@ -3,6 +3,7 @@ import {
   Get,
   Post,
   Put,
+  Delete,
   Body,
   Param,
   Query,
@@ -35,5 +36,12 @@ export class TaxController {
   @Roles('SUPERADMIN', 'MANAGER')
   async update(@Param('id') id: string, @Body() dto: UpdateTaxDto) {
     return this.taxService.update(id, dto);
+  }
+
+  @Delete(':id')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('SUPERADMIN', 'MANAGER')
+  async delete(@Param('id') id: string) {
+    return this.taxService.delete(id);
   }
 }

@@ -29,6 +29,24 @@ export class PaymentsService {
     });
   }
 
+  async updateMethod(id: string, payload: { name?: string; type?: string }) {
+    const method = await this.prisma.paymentMethod.findUnique({ where: { id } });
+    if (!method) throw new NotFoundException(`Payment method ${id} not found`);
+    return this.prisma.paymentMethod.update({
+      where: { id },
+      data: {
+        ...(payload.name !== undefined ? { name: payload.name } : {}),
+        ...(payload.type !== undefined ? { type: payload.type as any } : {}),
+      },
+    });
+  }
+
+  async deleteMethod(id: string) {
+    const method = await this.prisma.paymentMethod.findUnique({ where: { id } });
+    if (!method) throw new NotFoundException(`Payment method ${id} not found`);
+    return this.prisma.paymentMethod.update({ where: { id }, data: { isActive: false } });
+  }
+
   async processPayment(dto: ProcessPaymentDto) {
     const order = await this.prisma.order.findUnique({
       where: { id: dto.orderId },

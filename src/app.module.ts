@@ -15,6 +15,7 @@ import { InventoryModule } from './modules/inventory/inventory.module';
 import { RecipesModule } from './modules/recipes/recipes.module';
 import { PurchasingModule } from './modules/purchasing/purchasing.module';
 import { TaxModule } from './modules/tax/tax.module';
+import { ReportsModule } from './modules/reports/reports.module';
 
 @Module({
   imports: [
@@ -43,6 +44,7 @@ import { TaxModule } from './modules/tax/tax.module';
     RecipesModule,
     PurchasingModule,
     TaxModule,
+    ReportsModule,
   ],
   controllers: [],
   providers: [

@@ -38,6 +38,18 @@ export class InventoryService {
     return this.prisma.uom.findMany({ orderBy: { code: 'asc' } });
   }
 
+  async updateUom(id: string, payload: { code?: string; name?: string; type?: string }) {
+    const uom = await this.prisma.uom.findUnique({ where: { id } });
+    if (!uom) throw new NotFoundException(`UOM ${id} not found`);
+    return this.prisma.uom.update({ where: { id }, data: payload });
+  }
+
+  async deleteUom(id: string) {
+    const uom = await this.prisma.uom.findUnique({ where: { id } });
+    if (!uom) throw new NotFoundException(`UOM ${id} not found`);
+    return this.prisma.uom.delete({ where: { id } });
+  }
+
   // --------------------------------------------------
   // Inventory Items
   // --------------------------------------------------
@@ -72,6 +84,25 @@ export class InventoryService {
     });
   }
 
+  async updateInventoryItem(id: string, payload: Partial<CreateInventoryItemDto>) {
+    const item = await this.prisma.inventoryItem.findUnique({ where: { id } });
+    if (!item) throw new NotFoundException(`Inventory item ${id} not found`);
+    return this.prisma.inventoryItem.update({
+      where: { id },
+      data: payload,
+      include: { uom: true },
+    });
+  }
+
+  async deleteInventoryItem(id: string) {
+    const item = await this.prisma.inventoryItem.findUnique({ where: { id } });
+    if (!item) throw new NotFoundException(`Inventory item ${id} not found`);
+    return this.prisma.inventoryItem.update({
+      where: { id },
+      data: { isActive: false },
+    });
+  }
+
   // --------------------------------------------------
   // Warehouse & Stock Balance
   // --------------------------------------------------
@@ -83,6 +114,18 @@ export class InventoryService {
     return this.prisma.warehouse.findMany({
       where: { outletId, isActive: true },
     });
+  }
+
+  async updateWarehouse(id: string, payload: { name?: string; code?: string }) {
+    const warehouse = await this.prisma.warehouse.findUnique({ where: { id } });
+    if (!warehouse) throw new NotFoundException(`Warehouse ${id} not found`);
+    return this.prisma.warehouse.update({ where: { id }, data: payload });
+  }
+
+  async deleteWarehouse(id: string) {
+    const warehouse = await this.prisma.warehouse.findUnique({ where: { id } });
+    if (!warehouse) throw new NotFoundException(`Warehouse ${id} not found`);
+    return this.prisma.warehouse.update({ where: { id }, data: { isActive: false } });
   }
 
   async getWarehouseStock(warehouseId: string) {
@@ -275,6 +318,53 @@ export class InventoryService {
 
       return opname;
     });
+  }
+
+  // --------------------------------------------------
+  // Inventory Dashboard
+  // --------------------------------------------------
+  async getDashboard(outletId: string) {
+    const warehouseIds = (
+      await this.prisma.warehouse.findMany({
+        where: { outletId, isActive: true },
+        select: { id: true },
+      })
+    ).map((w) => w.id);
+
+    const totalItems = await this.prisma.inventoryItem.count({
+      where: { isActive: true },
+    });
+
+    const stocks = await this.prisma.stock.findMany({
+      where: { warehouseId: { in: warehouseIds } },
+      include: { inventoryItem: true },
+    });
+
+    const totalStockValue = stocks.reduce(
+      (sum, s) => sum + Number(s.quantity) * Number(s.inventoryItem.cost),
+      0,
+    );
+
+    const lowStockCount = stocks.filter(
+      (s) => Number(s.quantity) <= Number(s.inventoryItem.reorderLevel),
+    ).length;
+
+    const recentMovements = await this.prisma.stockMovement.findMany({
+      where: { warehouseId: { in: warehouseIds } },
+      include: {
+        inventoryItem: { select: { name: true } },
+        warehouse: { select: { name: true } },
+      },
+      orderBy: { occurredAt: 'desc' },
+      take: 10,
+    });
+
+    return {
+      totalItems,
+      totalStockValue,
+      lowStockCount,
+      recentMovements,
+    };
   }
 
   // --------------------------------------------------

@@ -217,20 +217,9 @@ Table
 
 QR hanya digunakan untuk mengidentifikasi meja/session. Tidak perlu menjadikan QR sebagai domain entity besar untuk MVP.
 
-## 4.3 TableSession
+## 4.3 Table Occupancy & Orders
 
-**TableSession adalah entity penting.**
-
-```text
-TableSession
-- id
-- tableId
-- outletId
-- openedAt
-- closedAt
-- status
-- guestCount
-```
+Status okupansi meja ditentukan langsung oleh keberadaan pesanan aktif (`Order.tableId`).
 
 Relationship:
 
@@ -240,27 +229,20 @@ Table
   └── 1:N
        │
        ▼
- TableSession
-       │
-       └── 1:N
-             │
-             ▼
-           Order
+     Order
 ```
 
-Satu table dapat memiliki beberapa session sepanjang waktu. Satu session dapat memiliki multiple orders.
+Satu table dapat memiliki beberapa order sepanjang waktu.
 
 Contoh:
 
 ```text
 TABLE 05
-  └── SESSION #001
-       ├── ORDER #001
-       ├── ORDER #002
-       └── ORDER #003
+  ├── ORDER #001 (CONFIRMED)
+  └── ORDER #002 (SERVED)
 ```
 
-**Jangan membuat relasi langsung `Table → Order` sebagai relasi utama.**
+Meja berstatus **OCCUPIED** jika terdapat order aktif dengan status `WAITING_PAYMENT`, `CONFIRMED`, atau `SERVED`. Meja berstatus **OPEN** jika seluruh order telah mencapai status `COMPLETED` atau `CANCELLED`.
 
 ---
 
@@ -272,7 +254,7 @@ TABLE 05
 Order
 - id
 - orderNumber
-- tableSessionId
+- tableId
 - channel
 - status
 - subtotal
@@ -497,7 +479,7 @@ Untuk MVP tidak perlu memaksakan entity `Bill` jika belum dibutuhkan.
 Model dasar:
 
 ```text
-TableSession
+Table Lock (derived from active orders)
     ↓
 Orders
     ↓
@@ -1171,9 +1153,6 @@ KOT dapat dikaitkan dengan printer.
 Gunakan aggregate root berikut sebagai boundary utama:
 
 ```text
-TableSession
-    └── Order
-
 Order
     ├── OrderItem
     ├── Payment
@@ -1218,7 +1197,6 @@ Tidak semua database table harus menjadi aggregate root.
 ## Core Transaction
 
 ```text
-TableSession
 Order
 OrderItem
 OrderItemModifier
@@ -1366,7 +1344,7 @@ KITCHEN
 
 # 23. Critical Business Rules
 
-1. **Table → TableSession → Order** adalah struktur utama table ordering.
+1. **Table → Order** adalah struktur utama table ordering. Okupansi meja dihitung dari order aktif (status `WAITING_PAYMENT`, `CONFIRMED`, `SERVED`).
 2. Jangan membuat `Table → Order` sebagai relasi utama.
 3. Customer/table adalah pusat flow order.
 4. Cashier bukan pusat pembuatan order.
@@ -1400,7 +1378,7 @@ Urutan implementasi domain:
 ```text
 1. Outlet / User / RBAC
         ↓
-2. Floor / Table / TableSession
+2. Floor / Table / Order (Table Occupancy)
         ↓
 3. Category / Product / Modifier
         ↓

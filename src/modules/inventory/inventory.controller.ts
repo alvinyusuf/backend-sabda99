@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Query, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Put, Delete, Body, Param, Query, UseGuards } from '@nestjs/common';
 import { InventoryService } from './inventory.service';
 import {
   CreateUomDto,
@@ -18,11 +18,30 @@ import { CurrentUser } from '../../common/decorators/current-user.decorator';
 export class InventoryController {
   constructor(private readonly inventoryService: InventoryService) {}
 
+  // Inventory Dashboard
+  @Get('dashboard')
+  @Roles('SUPERADMIN', 'MANAGER', 'INVENTORY')
+  async getDashboard(@Query('outletId') outletId: string) {
+    return this.inventoryService.getDashboard(outletId);
+  }
+
   // UOM Endpoints
   @Post('uoms')
   @Roles('SUPERADMIN', 'MANAGER', 'INVENTORY')
   async createUom(@Body() dto: CreateUomDto) {
     return this.inventoryService.createUom(dto);
+  }
+
+  @Put('uoms/:id')
+  @Roles('SUPERADMIN', 'MANAGER', 'INVENTORY')
+  async updateUom(@Param('id') id: string, @Body() dto: { code?: string; name?: string; type?: string }) {
+    return this.inventoryService.updateUom(id, dto);
+  }
+
+  @Delete('uoms/:id')
+  @Roles('SUPERADMIN', 'MANAGER', 'INVENTORY')
+  async deleteUom(@Param('id') id: string) {
+    return this.inventoryService.deleteUom(id);
   }
 
   @Get('uoms')
@@ -37,6 +56,18 @@ export class InventoryController {
     return this.inventoryService.createInventoryItem(dto);
   }
 
+  @Put('items/:id')
+  @Roles('SUPERADMIN', 'MANAGER', 'INVENTORY')
+  async updateItem(@Param('id') id: string, @Body() dto: Partial<CreateInventoryItemDto>) {
+    return this.inventoryService.updateInventoryItem(id, dto);
+  }
+
+  @Delete('items/:id')
+  @Roles('SUPERADMIN', 'MANAGER', 'INVENTORY')
+  async deleteItem(@Param('id') id: string) {
+    return this.inventoryService.deleteInventoryItem(id);
+  }
+
   @Get('items')
   async getItems() {
     return this.inventoryService.findAllInventoryItems();
@@ -47,6 +78,18 @@ export class InventoryController {
   @Roles('SUPERADMIN', 'MANAGER')
   async createWarehouse(@Body() dto: CreateWarehouseDto) {
     return this.inventoryService.createWarehouse(dto);
+  }
+
+  @Put('warehouses/:id')
+  @Roles('SUPERADMIN', 'MANAGER')
+  async updateWarehouse(@Param('id') id: string, @Body() dto: { name?: string; code?: string }) {
+    return this.inventoryService.updateWarehouse(id, dto);
+  }
+
+  @Delete('warehouses/:id')
+  @Roles('SUPERADMIN', 'MANAGER')
+  async deleteWarehouse(@Param('id') id: string) {
+    return this.inventoryService.deleteWarehouse(id);
   }
 
   @Get('warehouses')

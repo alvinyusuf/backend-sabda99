@@ -36,6 +36,18 @@ export class PurchasingService {
     return this.prisma.supplier.findMany({ orderBy: { name: 'asc' } });
   }
 
+  async updateSupplier(id: string, payload: { name?: string; contact?: string; address?: string; paymentTerms?: string }) {
+    const supplier = await this.prisma.supplier.findUnique({ where: { id } });
+    if (!supplier) throw new NotFoundException(`Supplier ${id} not found`);
+    return this.prisma.supplier.update({ where: { id }, data: payload });
+  }
+
+  async deleteSupplier(id: string) {
+    const supplier = await this.prisma.supplier.findUnique({ where: { id } });
+    if (!supplier) throw new NotFoundException(`Supplier ${id} not found}`);
+    return this.prisma.supplier.delete({ where: { id } });
+  }
+
   // Purchase Orders (Does NOT increase stock)
   async createPurchaseOrder(dto: CreatePurchaseOrderDto) {
     return this.prisma.purchaseOrder.create({

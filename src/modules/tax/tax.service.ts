@@ -63,4 +63,11 @@ export class TaxService {
       return updated;
     });
   }
+
+  async delete(id: string) {
+    const existing = await this.prisma.tax.findUnique({ where: { id } });
+    if (!existing) throw new NotFoundException(`Tax ID ${id} not found`);
+    await this.prisma.tax.delete({ where: { id } });
+    return { deleted: true };
+  }
 }

@@ -90,7 +90,7 @@ npx prisma db seed
 ### 1. Customer Scan QR Meja
 - **Endpoint**: `GET /api/v1/pos/customer/table-by-qr?qrToken=:token`
 - **Access**: Public (Customer Mobile App)
-- **Response**: Returns Table details along with `activeSession` if occupied.
+- **Response**: Returns Table details along with `isOccupied` and `activeOrders` array.
 
 ### 2. Floor & Table Management
 - `POST /api/v1/pos/floors` — Create floor (Protected: `SUPERADMIN`, `MANAGER`)
@@ -98,18 +98,6 @@ npx prisma db seed
 - `POST /api/v1/pos/tables` — Create new table (Auto-generates 32-hex `qrToken`)
 - `GET /api/v1/pos/tables?outletId=:id` — Get tables with real-time `isOccupied` indicator
 - `POST /api/v1/pos/tables/:id/regenerate-qr` — Re-issue QR code for table
-
-### 3. Table Session Lifecycle
-- **Open Session**: `POST /api/v1/pos/table-sessions/open`
-  ```json
-  {
-    "tableId": "uuid",
-    "guestCount": 2
-  }
-  ```
-- **Get Active Table Session**: `GET /api/v1/pos/table-sessions/active/:tableId`
-- **Close Session**: `POST /api/v1/pos/table-sessions/:id/close`
-  *(Guarded: Fails if session contains unpaid or uncompleted orders)*
 
 ---
 
@@ -166,7 +154,7 @@ npx prisma db seed
   ```json
   {
     "outletId": "00000000-0000-0000-0000-000000000001",
-    "tableSessionId": "uuid",
+    "tableId": "uuid",
     "channel": "TABLE",
     "notes": "Less ice please",
     "items": [

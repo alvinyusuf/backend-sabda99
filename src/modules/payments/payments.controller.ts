@@ -2,6 +2,8 @@ import {
   Controller,
   Get,
   Post,
+  Put,
+  Delete,
   Body,
   Param,
   Query,
@@ -34,6 +36,20 @@ export class PaymentsController {
   @Get('methods')
   async getMethods(@Query('outletId') outletId: string) {
     return this.paymentsService.findMethodsByOutlet(outletId);
+  }
+
+  @Put('methods/:id')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('SUPERADMIN', 'MANAGER')
+  async updateMethod(@Param('id') id: string, @Body() dto: { name?: string; type?: string }) {
+    return this.paymentsService.updateMethod(id, dto);
+  }
+
+  @Delete('methods/:id')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('SUPERADMIN', 'MANAGER')
+  async deleteMethod(@Param('id') id: string) {
+    return this.paymentsService.deleteMethod(id);
   }
 
   // Process / Initiate Payment (Public / Customer or Cashier)

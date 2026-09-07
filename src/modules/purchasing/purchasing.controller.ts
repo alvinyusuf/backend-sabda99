@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Put, Body, Param, Query, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Put, Delete, Body, Param, Query, UseGuards } from '@nestjs/common';
 import { PurchasingService } from './purchasing.service';
 import { PurchaseRequestService } from './services/purchase-request.service';
 import {
@@ -33,6 +33,18 @@ export class PurchasingController {
   @Get('suppliers')
   async getSuppliers() {
     return this.purchasingService.findAllSuppliers();
+  }
+
+  @Put('suppliers/:id')
+  @Roles('SUPERADMIN', 'MANAGER', 'PURCHASING')
+  async updateSupplier(@Param('id') id: string, @Body() dto: { name?: string; contact?: string; address?: string; paymentTerms?: string }) {
+    return this.purchasingService.updateSupplier(id, dto);
+  }
+
+  @Delete('suppliers/:id')
+  @Roles('SUPERADMIN', 'MANAGER', 'PURCHASING')
+  async deleteSupplier(@Param('id') id: string) {
+    return this.purchasingService.deleteSupplier(id);
   }
 
   // Purchase Orders

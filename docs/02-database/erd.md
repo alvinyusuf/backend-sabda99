@@ -108,7 +108,7 @@ erDiagram
     ORDER {
         uuid id PK
         uuid outlet_id FK
-        uuid table_session_id FK
+        uuid table_id FK
         varchar order_number UK
         varchar channel
         varchar status
@@ -1069,27 +1069,20 @@ MVP mengasumsikan satu Order memiliki satu Fulfillment lifecycle.
 
 Jika satu order kelak dapat diproses dalam beberapa fulfillment batch, constraint ini harus diubah.
 
-### 10.5 `TABLE_SESSION` → `ORDER`
+### 10.5 `TABLE` → `ORDER`
 
-`table_session_id` pada Order dibuat nullable secara database untuk memungkinkan:
+`table_id` pada Order dibuat nullable secara database untuk memungkinkan order channel `TAKEAWAY` dan `DIRECT` yang tidak terhubung ke meja.
 
-```text
-TAKEAWAY
-DIRECT
-```
-
-yang tidak memiliki table session.
-
-Untuk `channel = TABLE`, `table_session_id` wajib secara application/domain rule.
+Untuk `channel = TABLE`, `table_id` wajib secara application/domain rule.
 
 Recommended validation:
 
 ```text
 channel = TABLE
-→ table_session_id IS NOT NULL
+→ table_id IS NOT NULL
 
 channel = TAKEAWAY / DIRECT
-→ table_session_id MAY BE NULL
+→ table_id MAY BE NULL
 ```
 
 ### 10.6 Customer Entity
@@ -1109,7 +1102,7 @@ Relational FK tidak berarti semua entity berada dalam satu transaction/aggregate
 Aggregate boundaries:
 
 ```text
-TABLE_SESSION
+TABLE
 └── ORDER
     ├── ORDER_ITEM
     ├── ORDER_ITEM_MODIFIER
@@ -1327,7 +1320,7 @@ Do not generate Prisma schema by blindly converting every field above. The busin
 This ERD must remain consistent with:
 
 - Customer-centric ordering.
-- `Table → TableSession → Order`.
+- `Table → Order`. Status okupansi meja dihitung dari order aktif (status `WAITING_PAYMENT`, `CONFIRMED`, `SERVED`).
 - Cashier as payment/operational bridge, not primary order creator.
 - No KDS in MVP.
 - KOT as current kitchen communication mechanism.

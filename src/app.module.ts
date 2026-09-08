@@ -26,7 +26,7 @@ import { ReportsModule } from './modules/reports/reports.module';
         throttlers: [
           {
             ttl: config.get<number>('THROTTLE_TTL', 60) * 1000,
-            limit: config.get<number>('THROTTLE_LIMIT', 30),
+            limit: config.get<number>('THROTTLE_LIMIT', 10000),
           },
         ],
       }),

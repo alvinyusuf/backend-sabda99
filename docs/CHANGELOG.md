@@ -4,6 +4,17 @@ All activities, architectural setups, documentation restructuring, and backend m
 
 ---
 
+## [2.4.0] - 2026-09-09
+
+### ✨ Added
+
+- **Manual Table Reset / Force Open Endpoint** (`src/modules/tables/`):
+  - `POST /pos/tables/:id/reset`: Memungkinkan kasir (`CASHIER`), manager (`MANAGER`), atau superadmin (`SUPERADMIN`) melakukan reset meja occupied secara manual.
+  - Membatalkan otomatis order aktif gantung pada meja tersebut (`WAITING_PAYMENT`, `CONFIRMED`, `SERVED`) menjadi status `CANCELLED`.
+  - Mencatat log aksi ke `AuditLogService` (`TABLE_RESET`) yang menyimpan ID kasir, nomor meja, dan alasan reset.
+
+---
+
 ## [2.3.0] - 2026-09-07
 
 Audit Round 21 fixes — new endpoints, schema changes, permissions guard. Reference: `docs/audit/21-implementation-plan.md`

@@ -66,29 +66,63 @@ export class ShiftsService {
       .filter((m) => m.type === 'CASH_OUT')
       .reduce((sum, m) => sum + Number(m.amount), 0);
 
-    // Fetch cash payments confirmed during this shift time window
-    const cashPayments = await this.prisma.payment.findMany({
+    // Fetch all confirmed payments during this shift time window with payment method details
+    const shiftPayments = await this.prisma.payment.findMany({
       where: {
         confirmedById: shift.userId,
         confirmedAt: {
           gte: shift.openedAt,
         },
-        paymentMethod: {
-          type: 'CASH',
-        },
+        status: 'PAID',
+      },
+      include: {
+        paymentMethod: true,
       },
     });
 
-    const cashSalesTotal = cashPayments.reduce(
-      (sum, p) => sum + Number(p.amount),
-      0,
-    );
+    const cashSalesTotal = shiftPayments
+      .filter((p) => p.paymentMethod?.type === 'CASH')
+      .reduce((sum, p) => sum + Number(p.amount), 0);
+
+    // Aggregate payments by payment method
+    const paymentMethodMap = new Map<
+      string,
+      {
+        paymentMethodId: string;
+        methodName: string;
+        type: string;
+        totalAmount: number;
+        count: number;
+      }
+    >();
+
+    for (const payment of shiftPayments) {
+      const methodId = payment.paymentMethodId;
+      const methodName = payment.paymentMethod?.name || 'Unknown';
+      const methodType = payment.paymentMethod?.type || 'OTHER';
+      const amount = Number(payment.amount);
+
+      const existing = paymentMethodMap.get(methodId) || {
+        paymentMethodId: methodId,
+        methodName,
+        type: methodType,
+        totalAmount: 0,
+        count: 0,
+      };
+
+      existing.totalAmount += amount;
+      existing.count += 1;
+      paymentMethodMap.set(methodId, existing);
+    }
+
+    const paymentsByMethod = Array.from(paymentMethodMap.values());
 
     return {
       ...shift,
       cashInTotal,
       cashOutTotal,
       cashSalesTotal,
+      paymentsByMethod,
     };
   }
 
@@ -146,23 +180,56 @@ export class ShiftsService {
       .filter((m) => m.type === 'CASH_OUT')
       .reduce((sum, m) => sum + Number(m.amount), 0);
 
-    // Fetch cash payments confirmed during this shift time window
-    const cashPayments = await this.prisma.payment.findMany({
+    // Fetch all confirmed payments during this shift time window with payment method details
+    const shiftPayments = await this.prisma.payment.findMany({
       where: {
         confirmedById: shift.userId,
         confirmedAt: {
           gte: shift.openedAt,
         },
-        paymentMethod: {
-          type: 'CASH',
-        },
+        status: 'PAID',
+      },
+      include: {
+        paymentMethod: true,
       },
     });
 
-    const cashSalesTotal = cashPayments.reduce(
-      (sum, p) => sum + Number(p.amount),
-      0,
-    );
+    const cashSalesTotal = shiftPayments
+      .filter((p) => p.paymentMethod?.type === 'CASH')
+      .reduce((sum, p) => sum + Number(p.amount), 0);
+
+    // Aggregate payments by payment method
+    const paymentMethodMap = new Map<
+      string,
+      {
+        paymentMethodId: string;
+        methodName: string;
+        type: string;
+        totalAmount: number;
+        count: number;
+      }
+    >();
+
+    for (const payment of shiftPayments) {
+      const methodId = payment.paymentMethodId;
+      const methodName = payment.paymentMethod?.name || 'Unknown';
+      const methodType = payment.paymentMethod?.type || 'OTHER';
+      const amount = Number(payment.amount);
+
+      const existing = paymentMethodMap.get(methodId) || {
+        paymentMethodId: methodId,
+        methodName,
+        type: methodType,
+        totalAmount: 0,
+        count: 0,
+      };
+
+      existing.totalAmount += amount;
+      existing.count += 1;
+      paymentMethodMap.set(methodId, existing);
+    }
+
+    const paymentsByMethod = Array.from(paymentMethodMap.values());
 
     const expectedCash =
       openingCash + cashSalesTotal + cashInTotal - cashOutTotal;

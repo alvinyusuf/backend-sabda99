@@ -4,13 +4,17 @@ import {
   ConflictException,
 } from '@nestjs/common';
 import { PrismaService } from '../../../database/prisma.service';
-import { CreateTableDto, UpdateTableDto } from '../dto/table.dto';
+import { CreateTableDto, UpdateTableDto, ResetTableDto } from '../dto/table.dto';
+import { AuditLogService } from '../../../common/services/audit-log.service';
 import { randomBytes } from 'crypto';
 import { OrderStatus } from '@prisma/client';
 
 @Injectable()
 export class TablesService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private auditLogService: AuditLogService,
+  ) {}
 
   private generateQrToken(): string {
     return randomBytes(16).toString('hex');
@@ -167,5 +171,45 @@ export class TablesService {
       where: { id },
       data: { isActive },
     });
+  }
+
+  async resetTable(id: string, dto: ResetTableDto, user?: { id?: string; name?: string }) {
+    const table = await this.findOne(id);
+
+    const activeOrders = table.orders || [];
+    const cancelActiveOrders = dto?.cancelActiveOrders ?? true;
+    const reason = dto?.reason || 'Manual table reset by cashier/staff';
+
+    if (cancelActiveOrders && activeOrders.length > 0) {
+      const activeOrderIds = activeOrders.map((o) => o.id);
+
+      await this.prisma.$transaction(async (tx) => {
+        // Cancel all active orders for this table
+        await tx.order.updateMany({
+          where: {
+            id: { in: activeOrderIds },
+          },
+          data: {
+            status: OrderStatus.CANCELLED,
+            cancelledAt: new Date(),
+          },
+        });
+      });
+    }
+
+    await this.auditLogService.logAction(
+      'TABLE_RESET',
+      'Table',
+      table.id,
+      user?.id,
+      table.outletId,
+      {
+        tableNumber: table.number,
+        reason,
+        cancelledOrdersCount: cancelActiveOrders ? activeOrders.length : 0,
+      },
+    );
+
+    return this.findOne(id);
   }
 }

@@ -45,3 +45,13 @@ export class UpdateTableDto {
   @IsOptional()
   isActive?: boolean;
 }
+
+export class ResetTableDto {
+  @IsString()
+  @IsOptional()
+  reason?: string;
+
+  @IsBoolean()
+  @IsOptional()
+  cancelActiveOrders?: boolean;
+}

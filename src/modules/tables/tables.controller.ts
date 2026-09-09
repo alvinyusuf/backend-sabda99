@@ -11,10 +11,11 @@ import {
 import { FloorsService } from './services/floors.service';
 import { TablesService } from './services/tables.service';
 import { CreateFloorDto, UpdateFloorDto } from './dto/floor.dto';
-import { CreateTableDto, UpdateTableDto } from './dto/table.dto';
+import { CreateTableDto, UpdateTableDto, ResetTableDto } from './dto/table.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
+import { CurrentUser } from '../../common/decorators/current-user.decorator';
 
 @Controller('pos')
 export class TablesController {
@@ -108,5 +109,16 @@ export class TablesController {
     @Body('isActive') isActive: boolean,
   ) {
     return this.tablesService.toggleActive(id, isActive);
+  }
+
+  @Post('tables/:id/reset')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('SUPERADMIN', 'MANAGER', 'CASHIER')
+  async resetTable(
+    @Param('id') id: string,
+    @Body() dto: ResetTableDto,
+    @CurrentUser() user: any,
+  ) {
+    return this.tablesService.resetTable(id, dto, user);
   }
 }
